@@ -79,7 +79,7 @@ public class NewRelicConverters {
         void setUseCompression(ValueProvider<Boolean> useCompression);
     }
 
-    private static class FailsafeStringToNewRelicEvent
+    public static class FailsafeStringToNewRelicEvent
             extends PTransform<PCollection<FailsafeElement<String, String>>, PCollectionTuple> {
 
         private static final String TIMESTAMP_KEY = "timestamp";

@@ -5,6 +5,7 @@ import com.google.cloud.teleport.newrelic.NewRelicConverters;
 import com.google.cloud.teleport.newrelic.NewRelicEvent;
 import com.google.cloud.teleport.newrelic.NewRelicEventCoder;
 import com.google.cloud.teleport.newrelic.NewRelicIO;
+import com.google.cloud.teleport.newrelic.NewRelicPipeline;
 import com.google.cloud.teleport.templates.common.PubsubConverters.PubsubReadSubscriptionOptions;
 import com.google.cloud.teleport.util.KMSEncryptedNestedValueProvider;
 import com.google.cloud.teleport.values.FailsafeElement;
@@ -201,13 +202,16 @@ public class PubsubToNewRelic {
      */
     public interface PubSubToNewRelicOptions
             extends NewRelicConverters.NewRelicOptions,
-            PubsubReadSubscriptionOptions {}
-
     /**
      * A {@link PTransform} that reads messages from a Pub/Sub subscription, increments a counter and
      * returns a {@link PCollection} of {@link String} messages.
      */
-    private static class ReadMessages extends PTransform<PBegin, PCollection<String>> {
+
+
+            PubsubReadSubscriptionOptions {}
+
+    public static class ReadMessages extends PTransform<PBegin, PCollection<String>> {
+
         private final ValueProvider<String> subscriptionName;
 
         ReadMessages(ValueProvider<String> subscriptionName) {

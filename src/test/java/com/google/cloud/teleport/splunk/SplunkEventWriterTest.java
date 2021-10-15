@@ -15,12 +15,9 @@
  */
 package com.google.cloud.teleport.splunk;
 
-import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assume.assumeNoException;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import static com.google.common.truth.Truth.assertThat;
 import java.util.List;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
@@ -32,10 +29,12 @@ import org.apache.beam.sdk.transforms.Create;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
+import static org.junit.Assume.assumeNoException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.mockserver.client.MockServerClient;
 import org.mockserver.junit.MockServerRule;
 import org.mockserver.model.HttpRequest;
