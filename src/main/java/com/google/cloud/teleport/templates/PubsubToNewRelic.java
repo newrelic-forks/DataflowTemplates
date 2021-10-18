@@ -98,13 +98,6 @@ public class PubsubToNewRelic {
     public static final FailsafeElementCoder<String, String> FAILSAFE_ELEMENT_CODER =
             FailsafeElementCoder.of(StringUtf8Coder.of(), StringUtf8Coder.of());
 
-    /** The tag for successful {@link NewRelicEvent} conversion. */
-    private static final TupleTag<NewRelicEvent> NewRelic_EVENT_OUT = new TupleTag<NewRelicEvent>() {};
-
-    /** The tag for failed {@link NewRelicEvent} conversion. */
-    private static final TupleTag<FailsafeElement<String, String>> NewRelic_EVENT_DEADLETTER_OUT =
-            new TupleTag<FailsafeElement<String, String>>() {};
-
     /**
      * The main entry-point for pipeline execution. This method will start the pipeline but will not
      * wait for it's execution to finish. If blocking execution is required, use the {@link
@@ -115,73 +108,24 @@ public class PubsubToNewRelic {
      */
     public static void main(String[] args) {
 
-        PubSubToNewRelicOptions options =
+        final PubSubToNewRelicOptions options =
                 PipelineOptionsFactory.fromArgs(args).withValidation().as(PubSubToNewRelicOptions.class);
 
         run(options);
     }
 
-    /*
-     * Runs the pipeline to completion with the specified options. This method does not wait until the
-     * pipeline is finished before returning. Invoke {@code result.waitUntilFinish()} on the result
-     * object to block until the pipeline is finished running if blocking programmatic execution is
-     * required.
-     *
-     * @param options: the execution options.
-     * @return The pipeline result.
-     */
     public static PipelineResult run(PubSubToNewRelicOptions options) {
+        final Pipeline pipeline = Pipeline.create(options);
 
-        Pipeline pipeline = Pipeline.create(options);
+        final NewRelicPipeline nrPipeline = new NewRelicPipeline(
+                pipeline,
+                new ReadMessages(options.getInputSubscription()), new NewRelicIO.Write(options.getUrl(),
+                options.getTokenKMSEncryptionKey().isAccessible() ? maybeDecrypt(options.getApiKey(),
+                        options.getTokenKMSEncryptionKey()) : options.getApiKey(),
+                options.getBatchCount(), options.getParallelism(),
+                options.getDisableCertificateValidation(), options.getUseCompression()));
 
-        // Register New relic amd failsafe coders.
-        CoderRegistry registry = pipeline.getCoderRegistry();
-        registry.registerCoderForClass(NewRelicEvent.class, NewRelicEventCoder.of());
-        registry.registerCoderForType(
-                FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor(), FAILSAFE_ELEMENT_CODER);
-
-        /*
-         * Pipeline steps:
-         *  1) Read messages in from Pub/Sub
-         *  2) Convert message to FailsafeElement for processing.
-         *  3) Convert successfully transformed messages into NewRelicEvent objects
-         *  4) Write NewRelicEvents to NewRelic's Log API endpoint.
-         */
-
-        // 1) Read messages in from Pub/Sub
-        PCollection<String> stringMessages =
-                pipeline.apply(
-                        "Read messages from subscription",
-                        new ReadMessages(options.getInputSubscription()));
-
-        // 2) Convert message to FailsafeElement for processing.
-        PCollection<FailsafeElement<String, String>> transformedOutput =
-                stringMessages
-                        .apply(
-                                "Transform to Failsafe Element",
-                                MapElements.into(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor())
-                                        .via(input -> FailsafeElement.of(input, input)));
-
-        // 3) Convert successfully transformed messages into NewRelicEvent objects
-        PCollectionTuple convertToEventTuple =
-                transformedOutput
-                        .apply(
-                                "Transform to New Relic Event",
-                                NewRelicConverters.failsafeStringToNewRelicEvent(
-                                        NewRelic_EVENT_OUT, NewRelic_EVENT_DEADLETTER_OUT));
-
-        // 4) Write NewRelicEvents to NewRelic's Log API end point.
-        convertToEventTuple
-                .get(NewRelic_EVENT_OUT)
-                .apply(
-                        "Forward event to New Relic",
-                        new NewRelicIO.Write(options.getUrl(),
-                                options.getTokenKMSEncryptionKey().isAccessible() ? maybeDecrypt(options.getApiKey(),
-                                        options.getTokenKMSEncryptionKey()) : options.getApiKey(),
-                                options.getBatchCount(), options.getParallelism(),
-                                options.getDisableCertificateValidation(), options.getUseCompression()));
-
-        return pipeline.run();
+        return nrPipeline.run();
     }
 
     /**
@@ -230,6 +174,7 @@ public class PubsubToNewRelic {
                                     new DoFn<PubsubMessage, String>() {
                                         @ProcessElement
                                         public void processElement(ProcessContext context) {
+                                            // TODO Check whether we should also consider the attribute map present in the PubsubMessage
                                             context.output(new String(context.element().getPayload(), StandardCharsets.UTF_8));
                                         }
                                     }));

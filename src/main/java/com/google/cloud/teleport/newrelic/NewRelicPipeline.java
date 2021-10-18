@@ -38,6 +38,15 @@ public class NewRelicPipeline {
         this.newrelicMessageWriterTransform = newrelicMessageWriterTransform;
     }
 
+    /*
+     * Runs the pipeline to completion with the specified options. This method does not wait until the
+     * pipeline is finished before returning. Invoke {@code result.waitUntilFinish()} on the result
+     * object to block until the pipeline is finished running if blocking programmatic execution is
+     * required.
+     *
+     * @param options: the execution options.
+     * @return The pipeline result.
+     */
     public PipelineResult run(){
 
         // Register New relic amd failsafe coders.
