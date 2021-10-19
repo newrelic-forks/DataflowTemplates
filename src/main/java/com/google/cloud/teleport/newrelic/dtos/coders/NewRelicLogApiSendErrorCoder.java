@@ -56,7 +56,7 @@ public class NewRelicLogApiSendErrorCoder extends AtomicCoder<NewRelicLogApiSend
     @Override
     public void verifyDeterministic() throws Coder.NonDeterministicException {
         throw new Coder.NonDeterministicException(
-                this, "NewRelicWriteError can hold arbitrary instances, which may be non-deterministic.");
+                this, "NewRelicLogApiSendError can hold arbitrary instances, which may be non-deterministic.");
     }
 }
 

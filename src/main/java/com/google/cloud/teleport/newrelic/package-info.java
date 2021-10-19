@@ -14,5 +14,5 @@
  * the License.
  */
 
-/** SplunkIO support for templates. */
+/** New Relic support for templates. */
 package com.google.cloud.teleport.newrelic;

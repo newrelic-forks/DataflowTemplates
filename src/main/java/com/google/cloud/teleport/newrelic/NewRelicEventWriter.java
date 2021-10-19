@@ -22,6 +22,7 @@ import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Prec
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
+import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.common.base.MoreObjects;
@@ -85,58 +86,20 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     private Integer batchCount;
     private Boolean disableValidation;
     private HttpClient publisher;
+
+    // Serialized fields
     private ValueProvider<String> url;
     private ValueProvider<String> apiKey;
     private ValueProvider<Boolean> disableCertificateValidation;
     private ValueProvider<Integer> inputBatchCount;
     private ValueProvider<Boolean> useCompression;
 
-    /**
-     * Utility method to un-batch and flush failed write events.
-     *
-     * @param events List of {@link NewRelicLogRecord}s to un-batch
-     * @param statusMessage Status message to be added to {@link NewRelicLogApiSendError}
-     * @param statusCode Status code to be added to {@link NewRelicLogApiSendError}
-     * @param receiver Receiver to write {@link NewRelicLogApiSendError}s to
-     */
-    private static void flushWriteFailures(
-            List<NewRelicLogRecord> events,
-            String statusMessage,
-            Integer statusCode,
-            OutputReceiver<NewRelicLogApiSendError> receiver) {
-
-        checkNotNull(events, "NewRelicEvents cannot be null.");
-
-        for (NewRelicLogRecord event : events) {
-            String payload = GSON.toJson(event);
-
-            NewRelicLogApiSendError error = new NewRelicLogApiSendError();
-            error.setStatusMessage(statusMessage);
-            error.setStatusCode(statusCode);
-            error.setPayload(payload);
-
-            receiver.output(error);
-        }
-    }
-
-    public void setUrl(ValueProvider<String> url) {
-        this.url = url;
-    }
-
-    public void setApiKey(ValueProvider<String> apiKey) {
-        this.apiKey = apiKey;
-    }
-
-    public void setDisableCertificateValidation(ValueProvider<Boolean> disableCertificateValidation) {
-        this.disableCertificateValidation = disableCertificateValidation;
-    }
-
-    public void setInputBatchCount(ValueProvider<Integer> inputBatchCount) {
-        this.inputBatchCount = inputBatchCount;
-    }
-
-    public void setUseCompression(ValueProvider<Boolean> useCompression) {
-        this.useCompression = useCompression;
+    public NewRelicEventWriter(final NewRelicConfig newRelicConfig) {
+        this.url = newRelicConfig.getUrl();
+        this.apiKey = newRelicConfig.getApiKey();
+        this.disableCertificateValidation = newRelicConfig.getDisableCertificateValidation();
+        this.inputBatchCount = newRelicConfig.getBatchCount();
+        this.useCompression = newRelicConfig.getUseCompression();
     }
 
     @Setup
@@ -297,6 +260,34 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
                     response.disconnect();
                 }
             }
+        }
+    }
+
+    /**
+     * Utility method to un-batch and flush failed write events.
+     *
+     * @param events List of {@link NewRelicLogRecord}s to un-batch
+     * @param statusMessage Status message to be added to {@link NewRelicLogApiSendError}
+     * @param statusCode Status code to be added to {@link NewRelicLogApiSendError}
+     * @param receiver Receiver to write {@link NewRelicLogApiSendError}s to
+     */
+    private static void flushWriteFailures(
+            List<NewRelicLogRecord> events,
+            String statusMessage,
+            Integer statusCode,
+            OutputReceiver<NewRelicLogApiSendError> receiver) {
+
+        checkNotNull(events, "NewRelicEvents cannot be null.");
+
+        for (NewRelicLogRecord event : events) {
+            String payload = GSON.toJson(event);
+
+            NewRelicLogApiSendError error = new NewRelicLogApiSendError();
+            error.setStatusMessage(statusMessage);
+            error.setStatusCode(statusCode);
+            error.setPayload(payload);
+
+            receiver.output(error);
         }
     }
 

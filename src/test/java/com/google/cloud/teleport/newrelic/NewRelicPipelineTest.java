@@ -1,8 +1,7 @@
 package com.google.cloud.teleport.newrelic;
 
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
-import com.google.cloud.teleport.newrelic.config.NewRelicPipelineOptions;
-import com.google.cloud.teleport.newrelic.transforms.SendToNewRelic;
+import com.google.cloud.teleport.newrelic.transforms.NewRelicIO;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.transforms.Create;
@@ -69,7 +68,7 @@ public class NewRelicPipelineTest {
         NewRelicPipeline pipeline = new NewRelicPipeline(
                 testPipeline,
                 Create.of(message, jsonMessage),
-                new SendToNewRelic(getNewRelicConfig(url, 10, 1, false)));
+                new NewRelicIO(getNewRelicConfig(url, 10, 1, false)));
 
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
@@ -88,7 +87,7 @@ public class NewRelicPipelineTest {
                 VerificationTimes.once());
     }
 
-    private NewRelicConfig getNewRelicConfig(final String url, final int batchCount, final int parallelism, final boolean useCompression) {
+    private NewRelicConfig getNewRelicConfig(final String url, final Integer batchCount, final Integer parallelism, final Boolean useCompression) {
         final NewRelicConfig newRelicConfig = mock(NewRelicConfig.class);
         when(newRelicConfig.getUrl()).thenReturn(ValueProvider.StaticValueProvider.of(url));
         when(newRelicConfig.getApiKey()).thenReturn(ValueProvider.StaticValueProvider.of(API_KEY));
@@ -99,6 +98,8 @@ public class NewRelicPipelineTest {
 
         return newRelicConfig;
     }
+
+    // TODO Test that specifying null parameter options correctly use the default values (i.e. specifying null parallelism should result in parallelism=1)
 
     // TODO Test to check batching: sending 3 messages with a batching 2 results in 2 POST requests
 

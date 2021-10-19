@@ -25,14 +25,9 @@ public class FailsafeStringToNewRelicEvent
         extends PTransform<PCollection<FailsafeElement<String, String>>, PCollectionTuple> {
 
     private static final Logger LOG = LoggerFactory.getLogger(FailsafeStringToNewRelicEvent.class);
-
     private static final String TIMESTAMP_KEY = "timestamp";
-
-    private static final Counter CONVERSION_ERRORS = Metrics.counter(FailsafeStringToNewRelicEvent.class,
-            "newrelic-event-conversion-errors");
-
-    private static final Counter CONVERSION_SUCCESS = Metrics.counter(FailsafeStringToNewRelicEvent.class,
-            "newrelic-event-conversion-successes");
+    private static final Counter CONVERSION_ERRORS = Metrics.counter(FailsafeStringToNewRelicEvent.class, "newrelic-event-conversion-errors");
+    private static final Counter CONVERSION_SUCCESS = Metrics.counter(FailsafeStringToNewRelicEvent.class, "newrelic-event-conversion-successes");
 
     private TupleTag<NewRelicLogRecord> eventOutputTag;
     private TupleTag<FailsafeElement<String, String>> deadletterTag;

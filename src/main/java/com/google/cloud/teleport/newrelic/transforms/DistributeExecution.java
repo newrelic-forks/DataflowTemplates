@@ -17,15 +17,14 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * This PTransform adds a Key to each processed NewRelicEvent, resulting in a key-value pair (where the value is the
- * NewRelicEvent). This will effectively parallelize the execution, since all the records having the same key will
- * be processed by the same worker instance.
+ * This PTransform adds a Key to each processed {@link NewRelicLogRecord}, resulting in a key-value pair (where the
+ * value is the {@link NewRelicLogRecord}. This will effectively parallelize the execution, since all the records having
+ * the same key will be processed by the same worker instance.
  */
 public class DistributeExecution extends
         PTransform<PCollection<NewRelicLogRecord>, PCollection<KV<Integer, NewRelicLogRecord>>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DistributeExecution.class);
-
     private static final Integer DEFAULT_PARALLELISM = 1;
 
     private ValueProvider<Integer> specifiedParallelism;
@@ -48,6 +47,12 @@ public class DistributeExecution extends
 
     }
 
+    /**
+     * The InjectKeysFn associates a numeric Key, between 0 (inclusive) and "specifiedParallelism" (exclusive),
+     * to each of the {@link NewRelicLogRecord}s it processes. This will effectively distribute the processing of
+     * such log records (in a multi-worker cluster), since all the log records having the same key will be processed
+     * by the same worker.
+     */
     private class InjectKeysFn extends DoFn<NewRelicLogRecord, KV<Integer, NewRelicLogRecord>> {
 
         private ValueProvider<Integer> specifiedParallelism;

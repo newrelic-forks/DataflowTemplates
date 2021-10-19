@@ -71,6 +71,6 @@ public class NewRelicLogRecordCoder extends AtomicCoder<NewRelicLogRecord> {
 
     @Override
     public void verifyDeterministic() throws NonDeterministicException {
-        throw new NonDeterministicException(this, "NewRelicEvent can hold arbitrary instances, which may be non-deterministic.");
+        throw new NonDeterministicException(this, "NewRelicLogRecord can hold arbitrary instances, which may be non-deterministic.");
     }
 }
