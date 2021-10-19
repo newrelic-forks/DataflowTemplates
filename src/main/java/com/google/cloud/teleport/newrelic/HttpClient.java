@@ -12,6 +12,7 @@ import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.apache.v2.ApacheHttpTransport;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.StringUtils;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -38,7 +39,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * {@link HttpClient} is a utility class that helps write
- * {@link NewRelicEvent}s to a NewRelic Log API endpoint.
+ * {@link NewRelicLogRecord}s to a NewRelic Log API endpoint.
  */
 public class HttpClient {
     private static final Logger LOG = LoggerFactory.getLogger(HttpClient.class);
@@ -104,13 +105,13 @@ public class HttpClient {
     }
 
     /**
-     * Executes a POST for the list of {@link NewRelicEvent} objects into New
+     * Executes a POST for the list of {@link NewRelicLogRecord} objects into New
      * Relic's log API.
      *
-     * @param events List of {@link NewRelicEvent}s
+     * @param events List of {@link NewRelicLogRecord}s
      * @return {@link HttpResponse} for the POST.
      */
-    public HttpResponse execute(List<NewRelicEvent> events) throws IOException {
+    public HttpResponse execute(List<NewRelicLogRecord> events) throws IOException {
 
         HttpContent content = getContent(events);
         HttpRequest request = requestFactory.buildPostRequest(genericUrl, content);
@@ -128,11 +129,11 @@ public class HttpClient {
 
     /**
      * Same as {@link HttpClient#execute(List)} but with a single
-     * {@link NewRelicEvent}.
+     * {@link NewRelicLogRecord}.
      *
-     * @param event {@link NewRelicEvent} object.
+     * @param event {@link NewRelicLogRecord} object.
      */
-    public HttpResponse execute(NewRelicEvent event) throws IOException {
+    public HttpResponse execute(NewRelicLogRecord event) throws IOException {
         return this.execute(ImmutableList.of(event));
     }
 
@@ -168,14 +169,14 @@ public class HttpClient {
     }
 
     /**
-     * Utility method to marshall a list of {@link NewRelicEvent}s into an
+     * Utility method to marshall a list of {@link NewRelicLogRecord}s into an
      * {@link HttpContent} object that can be used to create an {@link HttpRequest}.
      *
-     * @param events List of {@link NewRelicEvent}s
+     * @param events List of {@link NewRelicLogRecord}s
      * @return {@link HttpContent} that can be used to create an
      *         {@link HttpRequest}.
      */
-    private HttpContent getContent(List<NewRelicEvent> events) {
+    private HttpContent getContent(List<NewRelicLogRecord> events) {
         String payload = getStringPayload(events);
         // LOG.debug("Payload content: {}", payload);
 
@@ -197,9 +198,9 @@ public class HttpClient {
     }
 
     /**
-     * Utility method to get payload string from a list of {@link NewRelicEvent}s.
+     * Utility method to get payload string from a list of {@link NewRelicLogRecord}s.
      */
-    private String getStringPayload(List<NewRelicEvent> events) {
+    private String getStringPayload(List<NewRelicLogRecord> events) {
         StringBuilder sb = new StringBuilder();
         sb.append('[');
         events.forEach(event -> sb.append(GSON.toJson(event)).append(','));

@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.cloud.teleport.newrelic;
+package com.google.cloud.teleport.newrelic.dtos.coders;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import org.apache.beam.sdk.coders.AtomicCoder;
 import org.apache.beam.sdk.coders.BigEndianLongCoder;
 import org.apache.beam.sdk.coders.NullableCoder;
@@ -25,49 +27,50 @@ import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.values.TypeDescriptor;
 
 /**
- * A {@link org.apache.beam.sdk.coders.Coder} for {@link NewRelicEvent} objects.
+ * A {@link org.apache.beam.sdk.coders.Coder} for {@link NewRelicLogRecord} objects. It allows serializing and
+ * deserializing {@link NewRelicLogRecord} objects, which can then be transmitted through a Beam pipeline using
+ * PCollection/PCollectionTuple objects.
  */
-public class NewRelicEventCoder extends AtomicCoder<NewRelicEvent> {
+public class NewRelicLogRecordCoder extends AtomicCoder<NewRelicLogRecord> {
 
-    private static final NewRelicEventCoder EVENT_CODER = new NewRelicEventCoder();
-    private static final TypeDescriptor<NewRelicEvent> TYPE_DESCRIPTOR = new TypeDescriptor<NewRelicEvent>() {};
+    private static final NewRelicLogRecordCoder EVENT_CODER = new NewRelicLogRecordCoder();
+    private static final TypeDescriptor<NewRelicLogRecord> TYPE_DESCRIPTOR = new TypeDescriptor<NewRelicLogRecord>() {};
     private static final StringUtf8Coder STRING_UTF_8_CODER = StringUtf8Coder.of();
     private static final NullableCoder<Long> LONG_NULLABLE_CODER = NullableCoder.of(BigEndianLongCoder.of());
 
-    public static NewRelicEventCoder of() {
+    public static NewRelicLogRecordCoder of() {
         return EVENT_CODER;
     }
 
     @Override
-    public void encode(NewRelicEvent value, OutputStream out) throws IOException {
-        LONG_NULLABLE_CODER.encode(value.getTimestamp(), out);
-        STRING_UTF_8_CODER.encode(value.getMessage(), out);
+    public void encode(final NewRelicLogRecord newRelicLogRecord, final OutputStream out) throws IOException {
+        LONG_NULLABLE_CODER.encode(newRelicLogRecord.getTimestamp(), out);
+        STRING_UTF_8_CODER.encode(newRelicLogRecord.getMessage(), out);
     }
 
     @Override
-    public NewRelicEvent decode(InputStream in) throws IOException {
+    public NewRelicLogRecord decode(final InputStream in) throws IOException {
 
-        NewRelicEvent nrEvent = new NewRelicEvent();
+        final NewRelicLogRecord newRelicLogRecord = new NewRelicLogRecord();
 
         Long time = LONG_NULLABLE_CODER.decode(in);
         if (time != null) {
-            nrEvent.setTimestamp(time);
+            newRelicLogRecord.setTimestamp(time);
         }
 
         String msg = STRING_UTF_8_CODER.decode(in);
-        nrEvent.setMessage(msg);
+        newRelicLogRecord.setMessage(msg);
 
-        return nrEvent;
+        return newRelicLogRecord;
     }
 
     @Override
-    public TypeDescriptor<NewRelicEvent> getEncodedTypeDescriptor() {
+    public TypeDescriptor<NewRelicLogRecord> getEncodedTypeDescriptor() {
         return TYPE_DESCRIPTOR;
     }
 
     @Override
     public void verifyDeterministic() throws NonDeterministicException {
-        throw new NonDeterministicException(
-                this, "NewRelicEvent can hold arbitrary instances, which may be non-deterministic.");
+        throw new NonDeterministicException(this, "NewRelicEvent can hold arbitrary instances, which may be non-deterministic.");
     }
 }

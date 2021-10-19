@@ -1,6 +1,9 @@
 package com.google.cloud.teleport.newrelic;
 
 import com.google.cloud.teleport.coders.FailsafeElementCoder;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
+import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogRecordCoder;
 import com.google.cloud.teleport.newrelic.transforms.FailsafeStringToNewRelicEvent;
 import com.google.cloud.teleport.values.FailsafeElement;
 import org.apache.beam.sdk.Pipeline;
@@ -23,25 +26,25 @@ public class NewRelicPipeline {
             FailsafeElementCoder.of(StringUtf8Coder.of(), StringUtf8Coder.of());
 
     /**
-     * The tag for successful {@link NewRelicEvent} conversion.
+     * The tag for successful {@link NewRelicLogRecord} conversion.
      */
-    private static final TupleTag<NewRelicEvent> NewRelic_EVENT_OUT = new TupleTag<NewRelicEvent>() {
+    private static final TupleTag<NewRelicLogRecord> NewRelic_EVENT_OUT = new TupleTag<NewRelicLogRecord>() {
     };
 
     /**
-     * The tag for failed {@link NewRelicEvent} conversion.
+     * The tag for failed {@link NewRelicLogRecord} conversion.
      */
     private static final TupleTag<FailsafeElement<String, String>> NewRelic_EVENT_DEADLETTER_OUT =
             new TupleTag<FailsafeElement<String, String>>() {
             };
 
     private final PTransform<PBegin, PCollection<String>> pubsubMessageReaderTransform;
-    private final PTransform<PCollection<NewRelicEvent>, PCollection<NewRelicWriteError>> newrelicMessageWriterTransform;
+    private final PTransform<PCollection<NewRelicLogRecord>, PCollection<NewRelicLogApiSendError>> newrelicMessageWriterTransform;
     private final Pipeline pipeline;
 
     public NewRelicPipeline(Pipeline pipeline,
                             PTransform<PBegin, PCollection<String>> pubsubMessageReaderTransform,
-                            PTransform<PCollection<NewRelicEvent>, PCollection<NewRelicWriteError>> newrelicMessageWriterTransform) {
+                            PTransform<PCollection<NewRelicLogRecord>, PCollection<NewRelicLogApiSendError>> newrelicMessageWriterTransform) {
         this.pipeline = pipeline;
         this.pubsubMessageReaderTransform = pubsubMessageReaderTransform;
         this.newrelicMessageWriterTransform = newrelicMessageWriterTransform;
@@ -60,7 +63,7 @@ public class NewRelicPipeline {
 
         // Register New relic amd failsafe coders.
         CoderRegistry registry = pipeline.getCoderRegistry();
-        registry.registerCoderForClass(NewRelicEvent.class, NewRelicEventCoder.of());
+        registry.registerCoderForClass(NewRelicLogRecord.class, NewRelicLogRecordCoder.of());
         registry.registerCoderForType(
                 FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor(), FAILSAFE_ELEMENT_CODER);
 

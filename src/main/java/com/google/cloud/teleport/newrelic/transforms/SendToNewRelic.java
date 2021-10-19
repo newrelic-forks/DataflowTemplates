@@ -1,12 +1,10 @@
 package com.google.cloud.teleport.newrelic.transforms;
 
-import com.google.cloud.teleport.newrelic.NewRelicEvent;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.NewRelicEventWriter;
-import com.google.cloud.teleport.newrelic.NewRelicWriteError;
-import com.google.cloud.teleport.newrelic.NewRelicWriteErrorCoder;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
+import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogApiSendErrorCoder;
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
-import com.google.cloud.teleport.newrelic.config.NewRelicPipelineOptions;
-import com.google.cloud.teleport.util.KMSEncryptedNestedValueProvider;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
@@ -17,12 +15,12 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 
 /**
- * Class {@link SendToNewRelic} provides a {@link PTransform} that allows writing {@link NewRelicEvent}
+ * Class {@link SendToNewRelic} provides a {@link PTransform} that allows writing {@link NewRelicLogRecord}
  * records into a NewRelic logs API end-point using HTTP POST requests. In the event of
- * an error, a {@link PCollection} of {@link NewRelicWriteError} records are returned for further
+ * an error, a {@link PCollection} of {@link NewRelicLogApiSendError} records are returned for further
  * processing or storing into a deadletter sink.
  */
-public class SendToNewRelic extends PTransform<PCollection<NewRelicEvent>, PCollection<NewRelicWriteError>> {
+public class SendToNewRelic extends PTransform<PCollection<NewRelicLogRecord>, PCollection<NewRelicLogApiSendError>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(SendToNewRelic.class);
 
@@ -66,7 +64,7 @@ public class SendToNewRelic extends PTransform<PCollection<NewRelicEvent>, PColl
     }
 
     @Override
-    public PCollection<NewRelicWriteError> expand(PCollection<NewRelicEvent> input) {
+    public PCollection<NewRelicLogApiSendError> expand(PCollection<NewRelicLogRecord> input) {
 
         LOG.info("Configuring NewRelicEventWriter.");
         NewRelicEventWriter writer = new NewRelicEventWriter();
@@ -81,6 +79,6 @@ public class SendToNewRelic extends PTransform<PCollection<NewRelicEvent>, PColl
         // Return a PCollection<NewRelicWriteError>
         return input
                 .apply("Distribute execution", DistributeExecution.withParallelism(parallelism))
-                .apply("Write NewRelic events", ParDo.of(writer)).setCoder(NewRelicWriteErrorCoder.of());
+                .apply("Write NewRelic events", ParDo.of(writer)).setCoder(NewRelicLogApiSendErrorCoder.of());
     }
 }

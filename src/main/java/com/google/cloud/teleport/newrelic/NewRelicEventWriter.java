@@ -22,6 +22,8 @@ import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Prec
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Lists;
 import com.google.gson.Gson;
@@ -55,9 +57,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A {@link DoFn} to write {@link NewRelicEvent}s to NewRelic's log API endpoint.
+ * A {@link DoFn} to write {@link NewRelicLogRecord}s to NewRelic's log API endpoint.
  */
-public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicEvent>, NewRelicWriteError> {
+public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, NewRelicLogApiSendError> {
 
     private static final Integer DEFAULT_BATCH_COUNT = 1;
     private static final Boolean DEFAULT_DISABLE_CERTIFICATE_VALIDATION = false;
@@ -75,7 +77,7 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicEvent>, NewRel
     private static final Gson GSON =
             new GsonBuilder().setFieldNamingStrategy(f -> f.getName().toLowerCase()).create();
     @StateId(BUFFER_STATE_NAME)
-    private final StateSpec<BagState<NewRelicEvent>> buffer = StateSpecs.bag();
+    private final StateSpec<BagState<NewRelicLogRecord>> buffer = StateSpecs.bag();
     @StateId(COUNT_STATE_NAME)
     private final StateSpec<ValueState<Long>> count = StateSpecs.value();
     @TimerId(TIME_ID_NAME)
@@ -92,23 +94,23 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicEvent>, NewRel
     /**
      * Utility method to un-batch and flush failed write events.
      *
-     * @param events List of {@link NewRelicEvent}s to un-batch
-     * @param statusMessage Status message to be added to {@link NewRelicWriteError}
-     * @param statusCode Status code to be added to {@link NewRelicWriteError}
-     * @param receiver Receiver to write {@link NewRelicWriteError}s to
+     * @param events List of {@link NewRelicLogRecord}s to un-batch
+     * @param statusMessage Status message to be added to {@link NewRelicLogApiSendError}
+     * @param statusCode Status code to be added to {@link NewRelicLogApiSendError}
+     * @param receiver Receiver to write {@link NewRelicLogApiSendError}s to
      */
     private static void flushWriteFailures(
-            List<NewRelicEvent> events,
+            List<NewRelicLogRecord> events,
             String statusMessage,
             Integer statusCode,
-            OutputReceiver<NewRelicWriteError> receiver) {
+            OutputReceiver<NewRelicLogApiSendError> receiver) {
 
         checkNotNull(events, "NewRelicEvents cannot be null.");
 
-        for (NewRelicEvent event : events) {
+        for (NewRelicLogRecord event : events) {
             String payload = GSON.toJson(event);
 
-            NewRelicWriteError error = new NewRelicWriteError();
+            NewRelicLogApiSendError error = new NewRelicLogApiSendError();
             error.setStatusMessage(statusMessage);
             error.setStatusCode(statusCode);
             error.setPayload(payload);
@@ -185,15 +187,15 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicEvent>, NewRel
 
     @ProcessElement
     public void processElement(
-            @Element KV<Integer, NewRelicEvent> input,
-            OutputReceiver<NewRelicWriteError> receiver,
+            @Element KV<Integer, NewRelicLogRecord> input,
+            OutputReceiver<NewRelicLogApiSendError> receiver,
             BoundedWindow window,
-            @StateId(BUFFER_STATE_NAME) BagState<NewRelicEvent> bufferState,
+            @StateId(BUFFER_STATE_NAME) BagState<NewRelicLogRecord> bufferState,
             @StateId(COUNT_STATE_NAME) ValueState<Long> countState,
             @TimerId(TIME_ID_NAME) Timer timer) throws IOException {
 
         Long count = MoreObjects.<Long>firstNonNull(countState.read(), 0L);
-        NewRelicEvent event = input.getValue();
+        NewRelicLogRecord event = input.getValue();
         INPUT_COUNTER.inc();
         bufferState.add(event);
         count += 1;
@@ -208,8 +210,8 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicEvent>, NewRel
     }
 
     @OnTimer(TIME_ID_NAME)
-    public void onExpiry(OutputReceiver<NewRelicWriteError> receiver,
-                         @StateId(BUFFER_STATE_NAME) BagState<NewRelicEvent> bufferState,
+    public void onExpiry(OutputReceiver<NewRelicLogApiSendError> receiver,
+                         @StateId(BUFFER_STATE_NAME) BagState<NewRelicLogRecord> bufferState,
                          @StateId(COUNT_STATE_NAME) ValueState<Long> countState) throws IOException {
 
         if (MoreObjects.<Long>firstNonNull(countState.read(), 0L) > 0) {
@@ -234,17 +236,17 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicEvent>, NewRel
     /**
      * Utility method to flush a batch of requests via {@link HttpClient}.
      *
-     * @param receiver Receiver to write {@link NewRelicWriteError}s to
+     * @param receiver Receiver to write {@link NewRelicLogApiSendError}s to
      */
     private void flush(
-            OutputReceiver<NewRelicWriteError> receiver,
-            @StateId(BUFFER_STATE_NAME) BagState<NewRelicEvent> bufferState,
+            OutputReceiver<NewRelicLogApiSendError> receiver,
+            @StateId(BUFFER_STATE_NAME) BagState<NewRelicLogRecord> bufferState,
             @StateId(COUNT_STATE_NAME) ValueState<Long> countState) throws IOException {
 
         if (!bufferState.isEmpty().read()) {
 
             HttpResponse response = null;
-            List<NewRelicEvent> events = Lists.newArrayList(bufferState.read());
+            List<NewRelicLogRecord> events = Lists.newArrayList(bufferState.read());
             try {
                 // Important to close this response to avoid connection leak.
                 long startTime = System.currentTimeMillis();

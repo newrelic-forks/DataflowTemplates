@@ -1,7 +1,7 @@
 package com.google.cloud.teleport.templates;
 
 import com.google.cloud.teleport.coders.FailsafeElementCoder;
-import com.google.cloud.teleport.newrelic.NewRelicEvent;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.NewRelicPipeline;
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
 import com.google.cloud.teleport.newrelic.config.PubSubToNewRelicPipelineOptions;
@@ -14,9 +14,9 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 
 /**
  * The {@link PubsubToNewRelic} pipeline is a streaming pipeline which ingests data from Cloud
- * Pub/Sub, executes a UDF, converts the output to {@link NewRelicEvent}s and writes those records
+ * Pub/Sub, executes a UDF, converts the output to {@link NewRelicLogRecord}s and writes those records
  * into NewRelic's API endpoint. Any errors which occur in the execution of the UDF, conversion to
- * {@link NewRelicEvent} or writing to API will be streamed into a Pub/Sub topic.
+ * {@link NewRelicLogRecord} or writing to API will be streamed into a Pub/Sub topic.
  *
  * <p><b>Pipeline Requirements</b>
  *

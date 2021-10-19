@@ -1,7 +1,7 @@
 package com.google.cloud.teleport.newrelic.transforms;
 
 import com.google.api.client.util.DateTime;
-import com.google.cloud.teleport.newrelic.NewRelicEvent;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.values.FailsafeElement;
 import com.google.common.base.Throwables;
 import org.apache.beam.sdk.metrics.Counter;
@@ -19,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@link PTransform}s messages (either as plain strings or as JSON strings) to {@link NewRelicEvent}s
+ * {@link PTransform}s messages (either as plain strings or as JSON strings) to {@link NewRelicLogRecord}s
  */
 public class FailsafeStringToNewRelicEvent
         extends PTransform<PCollection<FailsafeElement<String, String>>, PCollectionTuple> {
@@ -34,10 +34,10 @@ public class FailsafeStringToNewRelicEvent
     private static final Counter CONVERSION_SUCCESS = Metrics.counter(FailsafeStringToNewRelicEvent.class,
             "newrelic-event-conversion-successes");
 
-    private TupleTag<NewRelicEvent> eventOutputTag;
+    private TupleTag<NewRelicLogRecord> eventOutputTag;
     private TupleTag<FailsafeElement<String, String>> deadletterTag;
 
-    private FailsafeStringToNewRelicEvent(TupleTag<NewRelicEvent> eventOutputTag,
+    private FailsafeStringToNewRelicEvent(TupleTag<NewRelicLogRecord> eventOutputTag,
                                           TupleTag<FailsafeElement<String, String>> deadletterTag) {
         this.eventOutputTag = eventOutputTag;
         this.deadletterTag = deadletterTag;
@@ -45,7 +45,7 @@ public class FailsafeStringToNewRelicEvent
 
     /**
      * Returns a {@link FailsafeStringToNewRelicEvent} {@link PTransform} that
-     * consumes {@link FailsafeElement} messages and creates {@link NewRelicEvent}
+     * consumes {@link FailsafeElement} messages and creates {@link NewRelicLogRecord}
      * objects. Any conversion errors are wrapped into a {@link FailsafeElement}
      * with appropriate error information.
      *
@@ -54,7 +54,7 @@ public class FailsafeStringToNewRelicEvent
      * @param nrDeadletterTag  {@link TupleTag} to use for messages that failed
      *                         conversion.
      */
-    public static FailsafeStringToNewRelicEvent withOutputTags(TupleTag<NewRelicEvent> nrEventOutputTag,
+    public static FailsafeStringToNewRelicEvent withOutputTags(TupleTag<NewRelicLogRecord> nrEventOutputTag,
                                                                TupleTag<FailsafeElement<String, String>> nrDeadletterTag) {
         return new FailsafeStringToNewRelicEvent(nrEventOutputTag, nrDeadletterTag);
     }
@@ -62,7 +62,7 @@ public class FailsafeStringToNewRelicEvent
     @Override
     public PCollectionTuple expand(PCollection<FailsafeElement<String, String>> input) {
 
-        return input.apply("ConvertToNewRelicEvent", ParDo.of(new DoFn<FailsafeElement<String, String>, NewRelicEvent>() {
+        return input.apply("ConvertToNewRelicEvent", ParDo.of(new DoFn<FailsafeElement<String, String>, NewRelicLogRecord>() {
 
             @ProcessElement
             public void processElement(ProcessContext context) {
@@ -71,7 +71,7 @@ public class FailsafeStringToNewRelicEvent
 
                 try {
                     // Start building a NewRelicEvent with the payload as the message.
-                    NewRelicEvent nrEvent = new NewRelicEvent();
+                    NewRelicLogRecord nrEvent = new NewRelicLogRecord();
                     nrEvent.setMessage(input);
 
                     // We will attempt to parse the input to see

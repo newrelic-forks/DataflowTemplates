@@ -1,7 +1,7 @@
 package com.google.cloud.teleport.newrelic.transforms;
 
-import com.google.cloud.teleport.newrelic.NewRelicEvent;
-import com.google.cloud.teleport.newrelic.NewRelicEventCoder;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
+import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogRecordCoder;
 import org.apache.beam.sdk.coders.BigEndianIntegerCoder;
 import org.apache.beam.sdk.coders.KvCoder;
 import org.apache.beam.sdk.options.ValueProvider;
@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * be processed by the same worker instance.
  */
 public class DistributeExecution extends
-        PTransform<PCollection<NewRelicEvent>, PCollection<KV<Integer, NewRelicEvent>>> {
+        PTransform<PCollection<NewRelicLogRecord>, PCollection<KV<Integer, NewRelicLogRecord>>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DistributeExecution.class);
 
@@ -39,16 +39,16 @@ public class DistributeExecution extends
     }
 
     @Override
-    public PCollection<KV<Integer, NewRelicEvent>> expand(PCollection<NewRelicEvent> input) {
+    public PCollection<KV<Integer, NewRelicLogRecord>> expand(PCollection<NewRelicLogRecord> input) {
 
         return input
                 .apply("Inject Keys",
                         ParDo.of(new InjectKeysFn(this.specifiedParallelism))
-                ).setCoder(KvCoder.of(BigEndianIntegerCoder.of(), NewRelicEventCoder.of()));
+                ).setCoder(KvCoder.of(BigEndianIntegerCoder.of(), NewRelicLogRecordCoder.of()));
 
     }
 
-    private class InjectKeysFn extends DoFn<NewRelicEvent, KV<Integer, NewRelicEvent>> {
+    private class InjectKeysFn extends DoFn<NewRelicLogRecord, KV<Integer, NewRelicLogRecord>> {
 
         private ValueProvider<Integer> specifiedParallelism;
         private Integer calculatedParallelism;
@@ -74,7 +74,7 @@ public class DistributeExecution extends
         }
 
         @ProcessElement
-        public void processElement(DoFn<NewRelicEvent, KV<Integer, NewRelicEvent>>.ProcessContext context) {
+        public void processElement(DoFn<NewRelicLogRecord, KV<Integer, NewRelicLogRecord>>.ProcessContext context) {
             context.output(
                     KV.of(ThreadLocalRandom.current().nextInt(calculatedParallelism), context.element()));
         }
