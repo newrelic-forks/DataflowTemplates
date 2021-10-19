@@ -305,5 +305,4 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicEvent>, NewRel
         LOG.error("Failed to write {} events", countState.read());
         FAILED_WRITES.inc(countState.read());
     }
-
 }

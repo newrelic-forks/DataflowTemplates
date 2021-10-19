@@ -1,6 +1,7 @@
 package com.google.cloud.teleport.newrelic;
 
 import com.google.cloud.teleport.coders.FailsafeElementCoder;
+import com.google.cloud.teleport.newrelic.transforms.FailsafeStringToNewRelicEvent;
 import com.google.cloud.teleport.values.FailsafeElement;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
@@ -15,16 +16,24 @@ import org.apache.beam.sdk.values.TupleTag;
 
 public class NewRelicPipeline {
 
-    /** String/String Coder for FailsafeElement. */
+    /**
+     * String/String Coder for FailsafeElement.
+     */
     public static final FailsafeElementCoder<String, String> FAILSAFE_ELEMENT_CODER =
             FailsafeElementCoder.of(StringUtf8Coder.of(), StringUtf8Coder.of());
 
-    /** The tag for successful {@link NewRelicEvent} conversion. */
-    private static final TupleTag<NewRelicEvent> NewRelic_EVENT_OUT = new TupleTag<NewRelicEvent>() {};
+    /**
+     * The tag for successful {@link NewRelicEvent} conversion.
+     */
+    private static final TupleTag<NewRelicEvent> NewRelic_EVENT_OUT = new TupleTag<NewRelicEvent>() {
+    };
 
-    /** The tag for failed {@link NewRelicEvent} conversion. */
+    /**
+     * The tag for failed {@link NewRelicEvent} conversion.
+     */
     private static final TupleTag<FailsafeElement<String, String>> NewRelic_EVENT_DEADLETTER_OUT =
-            new TupleTag<FailsafeElement<String, String>>() {};
+            new TupleTag<FailsafeElement<String, String>>() {
+            };
 
     private final PTransform<PBegin, PCollection<String>> pubsubMessageReaderTransform;
     private final PTransform<PCollection<NewRelicEvent>, PCollection<NewRelicWriteError>> newrelicMessageWriterTransform;
@@ -47,7 +56,7 @@ public class NewRelicPipeline {
      * @param options: the execution options.
      * @return The pipeline result.
      */
-    public PipelineResult run(){
+    public PipelineResult run() {
 
         // Register New relic amd failsafe coders.
         CoderRegistry registry = pipeline.getCoderRegistry();
@@ -63,14 +72,13 @@ public class NewRelicPipeline {
         // 2) Convert message to FailsafeElement for processing.
         PCollection<FailsafeElement<String, String>> transformedOutput =
                 stringMessages
-                        .apply(
-                                "Transform to Failsafe Element",
+                        .apply("Transform to Failsafe Element",
                                 MapElements.into(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor())
                                         .via(input -> FailsafeElement.of(input, input)));
 
         // 3) Convert successfully transformed messages into NewRelicEvent objects
         PCollectionTuple convertToEventTuple = transformedOutput
-                .apply("Transform to New Relic Event", NewRelicConverters.failsafeStringToNewRelicEvent(
+                .apply("Transform to New Relic Event", FailsafeStringToNewRelicEvent.withOutputTags(
                         NewRelic_EVENT_OUT, NewRelic_EVENT_DEADLETTER_OUT));
 
         // 4) Write NewRelicEvents to NewRelic's Log API end point.

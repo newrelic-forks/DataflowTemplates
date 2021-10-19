@@ -1,5 +1,8 @@
 package com.google.cloud.teleport.newrelic;
 
+import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
+import com.google.cloud.teleport.newrelic.config.NewRelicPipelineOptions;
+import com.google.cloud.teleport.newrelic.transforms.SendToNewRelic;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.transforms.Create;
@@ -21,6 +24,8 @@ import java.time.Month;
 import java.time.ZoneOffset;
 
 import static org.junit.Assume.assumeNoException;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 /**
@@ -64,15 +69,7 @@ public class NewRelicPipelineTest {
         NewRelicPipeline pipeline = new NewRelicPipeline(
                 testPipeline,
                 Create.of(message, jsonMessage),
-                new NewRelicIO.Write(
-                        ValueProvider.StaticValueProvider.of(url),
-                        ValueProvider.StaticValueProvider.of(API_KEY),
-                        ValueProvider.StaticValueProvider.of(10),
-                        ValueProvider.StaticValueProvider.of(1),
-                        ValueProvider.StaticValueProvider.of(false),
-                        ValueProvider.StaticValueProvider.of(false)
-                )
-        );
+                new SendToNewRelic(getNewRelicConfig(url, 10, 1, false)));
 
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
@@ -80,7 +77,7 @@ public class NewRelicPipelineTest {
                 "      \"message\" : \"" + message + "\"\n" +
                 "    }, {\n" +
                 "      \"message\" : \"" + StringEscapeUtils.escapeJava(jsonMessage) + "\",\n"
-                + "\"timestamp\" : " + Long.toString(messageTimestamp.toInstant(ZoneOffset.UTC).toEpochMilli()) + "\n" +
+                + "\"timestamp\" : " + messageTimestamp.toInstant(ZoneOffset.UTC).toEpochMilli() + "\n" +
                 "    } ]");
         mockServerClient.verify(
                 HttpRequest.request(EXPECTED_PATH)
@@ -89,6 +86,18 @@ public class NewRelicPipelineTest {
                         .withHeader(Header.header("api-key", API_KEY))
                         .withBody(JsonBody.json(expectedBody)),
                 VerificationTimes.once());
+    }
+
+    private NewRelicConfig getNewRelicConfig(final String url, final int batchCount, final int parallelism, final boolean useCompression) {
+        final NewRelicConfig newRelicConfig = mock(NewRelicConfig.class);
+        when(newRelicConfig.getUrl()).thenReturn(ValueProvider.StaticValueProvider.of(url));
+        when(newRelicConfig.getApiKey()).thenReturn(ValueProvider.StaticValueProvider.of(API_KEY));
+        when(newRelicConfig.getBatchCount()).thenReturn(ValueProvider.StaticValueProvider.of(batchCount));
+        when(newRelicConfig.getParallelism()).thenReturn(ValueProvider.StaticValueProvider.of(parallelism));
+        when(newRelicConfig.getDisableCertificateValidation()).thenReturn(ValueProvider.StaticValueProvider.of(false));
+        when(newRelicConfig.getUseCompression()).thenReturn(ValueProvider.StaticValueProvider.of(useCompression));
+
+        return newRelicConfig;
     }
 
     // TODO Test to check batching: sending 3 messages with a batching 2 results in 2 POST requests

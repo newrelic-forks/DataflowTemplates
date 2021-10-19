@@ -1,31 +1,16 @@
 package com.google.cloud.teleport.templates;
 
 import com.google.cloud.teleport.coders.FailsafeElementCoder;
-import com.google.cloud.teleport.newrelic.NewRelicConverters;
 import com.google.cloud.teleport.newrelic.NewRelicEvent;
-import com.google.cloud.teleport.newrelic.NewRelicEventCoder;
-import com.google.cloud.teleport.newrelic.NewRelicIO;
 import com.google.cloud.teleport.newrelic.NewRelicPipeline;
-import com.google.cloud.teleport.templates.common.PubsubConverters.PubsubReadSubscriptionOptions;
-import com.google.cloud.teleport.util.KMSEncryptedNestedValueProvider;
-import com.google.cloud.teleport.values.FailsafeElement;
-import java.nio.charset.StandardCharsets;
+import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
+import com.google.cloud.teleport.newrelic.config.PubSubToNewRelicPipelineOptions;
+import com.google.cloud.teleport.newrelic.transforms.ReadMessagesFromPubSub;
+import com.google.cloud.teleport.newrelic.transforms.SendToNewRelic;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
-import org.apache.beam.sdk.coders.CoderRegistry;
 import org.apache.beam.sdk.coders.StringUtf8Coder;
-import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
-import org.apache.beam.sdk.io.gcp.pubsub.PubsubMessage;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
-import org.apache.beam.sdk.options.ValueProvider;
-import org.apache.beam.sdk.transforms.DoFn;
-import org.apache.beam.sdk.transforms.MapElements;
-import org.apache.beam.sdk.transforms.PTransform;
-import org.apache.beam.sdk.transforms.ParDo;
-import org.apache.beam.sdk.values.PBegin;
-import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.PCollectionTuple;
-import org.apache.beam.sdk.values.TupleTag;
 
 /**
  * The {@link PubsubToNewRelic} pipeline is a streaming pipeline which ingests data from Cloud
@@ -94,90 +79,37 @@ import org.apache.beam.sdk.values.TupleTag;
  */
 public class PubsubToNewRelic {
 
-    /** String/String Coder for FailsafeElement. */
+    /**
+     * String/String Coder for FailsafeElement.
+     */
     public static final FailsafeElementCoder<String, String> FAILSAFE_ELEMENT_CODER =
             FailsafeElementCoder.of(StringUtf8Coder.of(), StringUtf8Coder.of());
 
     /**
      * The main entry-point for pipeline execution. This method will start the pipeline but will not
      * wait for it's execution to finish. If blocking execution is required, use the {@link
-     * PubsubToNewRelic#run(PubSubToNewRelicOptions)} method to start the pipeline and invoke {@code
+     * PubsubToNewRelic#run(PubSubToNewRelicPipelineOptions)} method to start the pipeline and invoke {@code
      * result.waitUntilFinish()} on the {@link PipelineResult}.
      *
      * @param args The command-line args passed by the executor.
      */
     public static void main(String[] args) {
 
-        final PubSubToNewRelicOptions options =
-                PipelineOptionsFactory.fromArgs(args).withValidation().as(PubSubToNewRelicOptions.class);
+        final PubSubToNewRelicPipelineOptions options =
+                PipelineOptionsFactory.fromArgs(args).withValidation().as(PubSubToNewRelicPipelineOptions.class);
 
         run(options);
     }
 
-    public static PipelineResult run(PubSubToNewRelicOptions options) {
+    public static PipelineResult run(PubSubToNewRelicPipelineOptions options) {
         final Pipeline pipeline = Pipeline.create(options);
 
         final NewRelicPipeline nrPipeline = new NewRelicPipeline(
                 pipeline,
-                new ReadMessages(options.getInputSubscription()), new NewRelicIO.Write(options.getUrl(),
-                options.getTokenKMSEncryptionKey().isAccessible() ? maybeDecrypt(options.getApiKey(),
-                        options.getTokenKMSEncryptionKey()) : options.getApiKey(),
-                options.getBatchCount(), options.getParallelism(),
-                options.getDisableCertificateValidation(), options.getUseCompression()));
+                new ReadMessagesFromPubSub(options.getInputSubscription()),
+                new SendToNewRelic(NewRelicConfig.fromPipelineOptions(options))
+        );
 
         return nrPipeline.run();
-    }
-
-    /**
-     * Utility method to decrypt a NewRelic API token.
-     *
-     * @param unencryptedToken The NewRelic API token as a Base64 encoded {@link String} encrypted with a Cloud KMS Key.
-     * @param kmsKey The Cloud KMS Encryption Key to decrypt the NewRelic API token.
-     * @return Decrypted NewRelic API token.
-     */
-    private static ValueProvider<String> maybeDecrypt(
-            ValueProvider<String> unencryptedToken, ValueProvider<String> kmsKey) {
-        return new KMSEncryptedNestedValueProvider(unencryptedToken, kmsKey);
-    }
-
-    /**
-     * The {@link PubSubToNewRelicOptions} class provides the custom options passed by the executor at
-     * the command line.
-     */
-    public interface PubSubToNewRelicOptions
-            extends NewRelicConverters.NewRelicOptions,
-    /**
-     * A {@link PTransform} that reads messages from a Pub/Sub subscription, increments a counter and
-     * returns a {@link PCollection} of {@link String} messages.
-     */
-
-
-            PubsubReadSubscriptionOptions {}
-
-    public static class ReadMessages extends PTransform<PBegin, PCollection<String>> {
-
-        private final ValueProvider<String> subscriptionName;
-
-        ReadMessages(ValueProvider<String> subscriptionName) {
-            this.subscriptionName = subscriptionName;
-        }
-
-        @Override
-        public PCollection<String> expand(PBegin input) {
-            return input
-                    .apply(
-                            "ReadPubsubMessage",
-                            PubsubIO.readMessagesWithAttributes().fromSubscription(subscriptionName))
-                    .apply(
-                            "ExtractMessage",
-                            ParDo.of(
-                                    new DoFn<PubsubMessage, String>() {
-                                        @ProcessElement
-                                        public void processElement(ProcessContext context) {
-                                            // TODO Check whether we should also consider the attribute map present in the PubsubMessage
-                                            context.output(new String(context.element().getPayload(), StandardCharsets.UTF_8));
-                                        }
-                                    }));
-        }
     }
 }
