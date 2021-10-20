@@ -30,9 +30,12 @@ public class ReadMessagesFromPubSub extends PTransform<PBegin, PCollection<Strin
                         ParDo.of(
                                 new DoFn<PubsubMessage, String>() {
                                     @ProcessElement
-                                    public void processElement(ProcessContext context) {
+                                    public void processElement(
+                                            @Element PubsubMessage inputElement,
+                                            OutputReceiver<String> outputReceiver
+                                    ) {
                                         // TODO Check whether we should also consider the attribute map present in the PubsubMessage
-                                        context.output(new String(context.element().getPayload(), StandardCharsets.UTF_8));
+                                        outputReceiver.output(new String(inputElement.getPayload(), StandardCharsets.UTF_8));
                                     }
                                 }));
     }

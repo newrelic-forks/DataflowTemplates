@@ -1,8 +1,8 @@
 package com.google.cloud.teleport.newrelic;
 
 import com.google.cloud.teleport.coders.FailsafeElementCoder;
-import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogRecordCoder;
 import com.google.cloud.teleport.newrelic.transforms.FailsafeStringToNewRelicEvent;
 import com.google.cloud.teleport.values.FailsafeElement;
@@ -81,13 +81,13 @@ public class NewRelicPipeline {
 
         // 3) Convert successfully transformed messages into NewRelicEvent objects
         PCollectionTuple convertToEventTuple = transformedOutput
-                .apply("Transform to New Relic Event", FailsafeStringToNewRelicEvent.withOutputTags(
+                .apply("Transform to NewRelicLogRecord", FailsafeStringToNewRelicEvent.withOutputTags(
                         NewRelic_EVENT_OUT, NewRelic_EVENT_DEADLETTER_OUT));
 
         // 4) Write NewRelicEvents to NewRelic's Log API end point.
         convertToEventTuple
                 .get(NewRelic_EVENT_OUT)
-                .apply("Forward event to New Relic", newrelicMessageWriterTransform);
+                .apply("Forward logs to New Relic", newrelicMessageWriterTransform);
 
         return pipeline.run();
     }

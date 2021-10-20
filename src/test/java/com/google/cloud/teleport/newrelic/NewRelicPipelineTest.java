@@ -91,7 +91,7 @@ public class NewRelicPipelineTest {
         final NewRelicConfig newRelicConfig = mock(NewRelicConfig.class);
         when(newRelicConfig.getUrl()).thenReturn(ValueProvider.StaticValueProvider.of(url));
         when(newRelicConfig.getApiKey()).thenReturn(ValueProvider.StaticValueProvider.of(API_KEY));
-        when(newRelicConfig.getBatchCount()).thenReturn(ValueProvider.StaticValueProvider.of(batchCount));
+        when(newRelicConfig.getBatchCount()).thenReturn(null);
         when(newRelicConfig.getParallelism()).thenReturn(ValueProvider.StaticValueProvider.of(parallelism));
         when(newRelicConfig.getDisableCertificateValidation()).thenReturn(ValueProvider.StaticValueProvider.of(false));
         when(newRelicConfig.getUseCompression()).thenReturn(ValueProvider.StaticValueProvider.of(useCompression));
@@ -108,4 +108,6 @@ public class NewRelicPipelineTest {
     // TODO Test to check deadlettering: sending 2 messages with a batching of 1 and creating an expectation in the
     // MockServer that rejects the message with a 500 if the message content equals BLA. We ensure that the
     // rejected message ends up in the deadletter queue
+
+
 }

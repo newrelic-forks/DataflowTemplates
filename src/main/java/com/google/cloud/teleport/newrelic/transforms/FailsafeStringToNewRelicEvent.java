@@ -60,9 +60,12 @@ public class FailsafeStringToNewRelicEvent
         return input.apply("ConvertToNewRelicEvent", ParDo.of(new DoFn<FailsafeElement<String, String>, NewRelicLogRecord>() {
 
             @ProcessElement
-            public void processElement(ProcessContext context) {
+            public void processElement(
+                    @Element FailsafeElement<String, String> inputElement,
+                    MultiOutputReceiver outputReceivers
+            ) {
 
-                String input = context.element().getPayload();
+                final String input = inputElement.getPayload();
 
                 try {
                     // Start building a NewRelicEvent with the payload as the message.
@@ -100,12 +103,12 @@ public class FailsafeStringToNewRelicEvent
                         // this is expected behavior.
                     }
 
-                    context.output(eventOutputTag, nrEvent);
+                    outputReceivers.get(eventOutputTag).output(nrEvent);
                     CONVERSION_SUCCESS.inc();
 
                 } catch (Exception e) {
                     CONVERSION_ERRORS.inc();
-                    context.output(deadletterTag, FailsafeElement.of(input, input).setErrorMessage(e.getMessage())
+                    outputReceivers.get(deadletterTag).output(FailsafeElement.of(input, input).setErrorMessage(e.getMessage())
                             .setStacktrace(Throwables.getStackTraceAsString(e)));
                 }
             }

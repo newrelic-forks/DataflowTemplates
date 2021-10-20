@@ -16,29 +16,16 @@
 
 package com.google.cloud.teleport.newrelic;
 
-import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Preconditions.checkArgument;
-import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
-import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
+import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.util.List;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.ValueProvider;
@@ -51,20 +38,34 @@ import org.apache.beam.sdk.state.TimerSpec;
 import org.apache.beam.sdk.state.TimerSpecs;
 import org.apache.beam.sdk.state.ValueState;
 import org.apache.beam.sdk.transforms.DoFn;
-import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.values.KV;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.util.List;
+
+import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Preconditions.checkArgument;
+import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A {@link DoFn} to write {@link NewRelicLogRecord}s to NewRelic's log API endpoint.
  */
 public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, NewRelicLogApiSendError> {
 
-    private static final Integer DEFAULT_BATCH_COUNT = 1;
-    private static final Boolean DEFAULT_DISABLE_CERTIFICATE_VALIDATION = false;
     private static final Logger LOG = LoggerFactory.getLogger(NewRelicEventWriter.class);
+    private static final int DEFAULT_BATCH_COUNT = 1;
+    private static final boolean DEFAULT_DISABLE_CERTIFICATE_VALIDATION = false;
+    private static final boolean DEFAULT_USE_COMPRESSION = true;
     private static final long DEFAULT_FLUSH_DELAY = 2;
     private static final Counter INPUT_COUNTER = Metrics
             .counter(NewRelicEventWriter.class, "inbound-events");
@@ -77,67 +78,62 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     private static final String TIME_ID_NAME = "expiry";
     private static final Gson GSON =
             new GsonBuilder().setFieldNamingStrategy(f -> f.getName().toLowerCase()).create();
+
     @StateId(BUFFER_STATE_NAME)
     private final StateSpec<BagState<NewRelicLogRecord>> buffer = StateSpecs.bag();
     @StateId(COUNT_STATE_NAME)
     private final StateSpec<ValueState<Long>> count = StateSpecs.value();
     @TimerId(TIME_ID_NAME)
     private final TimerSpec expirySpec = TimerSpecs.timer(TimeDomain.EVENT_TIME);
+
+    // Non-serialized fields: these are set up once the DoFn has potentially been deserialized, in the @Setup method.
     private Integer batchCount;
-    private Boolean disableValidation;
+    private Boolean disableCertificateValidation;
+    private Boolean useCompression;
     private HttpClient publisher;
 
     // Serialized fields
     private ValueProvider<String> url;
     private ValueProvider<String> apiKey;
-    private ValueProvider<Boolean> disableCertificateValidation;
+    private ValueProvider<Boolean> inputDisableCertificateValidation;
     private ValueProvider<Integer> inputBatchCount;
-    private ValueProvider<Boolean> useCompression;
+    private ValueProvider<Boolean> inputUseCompression;
 
     public NewRelicEventWriter(final NewRelicConfig newRelicConfig) {
         this.url = newRelicConfig.getUrl();
         this.apiKey = newRelicConfig.getApiKey();
-        this.disableCertificateValidation = newRelicConfig.getDisableCertificateValidation();
+        this.inputDisableCertificateValidation = newRelicConfig.getDisableCertificateValidation();
         this.inputBatchCount = newRelicConfig.getBatchCount();
-        this.useCompression = newRelicConfig.getUseCompression();
+        this.inputUseCompression = newRelicConfig.getUseCompression();
     }
 
     @Setup
     public void setup() {
 
-        checkArgument(url.isAccessible(), "url is required for writing events.");
-        checkArgument(apiKey.isAccessible(), "API key is required for writing events.");
+        checkArgument(url != null && url.isAccessible(), "url is required for writing events.");
+        checkArgument(apiKey != null && apiKey.isAccessible(), "API key is required for writing events.");
 
-        // Either user supplied or default batchCount.
-        if (batchCount == null) {
+        batchCount = inputBatchCount != null && inputBatchCount.isAccessible()
+                ? inputBatchCount.get()
+                : DEFAULT_BATCH_COUNT;
+        LOG.info("Batch count set to: {}", batchCount);
 
-            if (inputBatchCount != null) {
-                batchCount = inputBatchCount.get();
-            }
+        disableCertificateValidation = inputDisableCertificateValidation != null && inputDisableCertificateValidation.isAccessible()
+                ? inputDisableCertificateValidation.get()
+                : DEFAULT_DISABLE_CERTIFICATE_VALIDATION;
+        LOG.info("Disable certificate validation set to: {}", disableCertificateValidation);
 
-            batchCount = MoreObjects.firstNonNull(batchCount, DEFAULT_BATCH_COUNT);
-            LOG.info("Batch count set to: {}", batchCount);
-        }
-
-        // Either user supplied or default disableValidation.
-        if (disableValidation == null) {
-
-            if (disableCertificateValidation != null) {
-                disableValidation = disableCertificateValidation.get();
-            }
-
-            disableValidation =  MoreObjects.firstNonNull(disableValidation, DEFAULT_DISABLE_CERTIFICATE_VALIDATION);
-            LOG.info("Disable certificate validation set to: {}", disableValidation);
-        }
-
-        LOG.info("Use Compression set to: {}", useCompression.get());
+        useCompression = inputUseCompression != null && inputUseCompression.isAccessible()
+                ? inputUseCompression.get()
+                : DEFAULT_USE_COMPRESSION;
+        LOG.info("Use Compression set to: {}", useCompression);
 
         try {
             this.publisher = new HttpClient();
             publisher.setGenericUrl(new GenericUrl(url.get()));
             publisher.setApiKey(apiKey.get());
-            publisher.setDisableCertificateValidation(disableValidation);
-            publisher.setUseCompression(useCompression.get());
+            publisher.setDisableCertificateValidation(disableCertificateValidation);
+            publisher.setUseCompression(useCompression);
             publisher.init();
 
             LOG.info("Successfully created HttpEventPublisher");
@@ -152,7 +148,6 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     public void processElement(
             @Element KV<Integer, NewRelicLogRecord> input,
             OutputReceiver<NewRelicLogApiSendError> receiver,
-            BoundedWindow window,
             @StateId(BUFFER_STATE_NAME) BagState<NewRelicLogRecord> bufferState,
             @StateId(COUNT_STATE_NAME) ValueState<Long> countState,
             @TimerId(TIME_ID_NAME) Timer timer) throws IOException {

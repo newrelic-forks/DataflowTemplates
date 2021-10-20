@@ -79,9 +79,11 @@ public class DistributeExecution extends
         }
 
         @ProcessElement
-        public void processElement(DoFn<NewRelicLogRecord, KV<Integer, NewRelicLogRecord>>.ProcessContext context) {
-            context.output(
-                    KV.of(ThreadLocalRandom.current().nextInt(calculatedParallelism), context.element()));
+        public void processElement(
+                @Element NewRelicLogRecord inputElement,
+                OutputReceiver<KV<Integer, NewRelicLogRecord>> outputReceiver) {
+
+            outputReceiver.output(KV.of(ThreadLocalRandom.current().nextInt(calculatedParallelism), inputElement));
         }
     }
 }
