@@ -13,6 +13,7 @@ import com.google.api.client.http.apache.v2.ApacheHttpTransport;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.StringUtils;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
+import com.google.common.base.MoreObjects;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -26,6 +27,10 @@ import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.HostnameVerifier;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.ImmutableList;
 import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.ImmutableSet;
 import org.apache.http.client.config.CookieSpecs;
@@ -147,39 +152,40 @@ public class HttpClient {
     }
 
     /**
-     * Executes a POST for the list of {@link NewRelicLogRecord} objects into New
-     * Relic's log API.
+     * Sends a list of {@link NewRelicLogRecord} objects to New Relic Logs
      *
      * @param logRecords List of {@link NewRelicLogRecord}s
-     * @return {@link HttpResponse} for the POST.
+     * @return {@link HttpResponse} Response for the performed HTTP POST .
      */
     public HttpResponse send(final List<NewRelicLogRecord> logRecords) throws IOException {
-        final HttpContent content = getContent(logRecords);
+        final byte[] bodyBytes = StringUtils.getBytesUtf8(toJsonString(logRecords));
+        final byte[] compressedBodyBytes = useCompression ? compress(bodyBytes) : null;
+
+        final HttpContent content = new ByteArrayContent("application/json", MoreObjects.firstNonNull(compressedBodyBytes, bodyBytes));
 
         final HttpRequest request = requestFactory.buildPostRequest(genericUrl, content);
         request.setUnsuccessfulResponseHandler(RESPONSE_HANDLER);
-        setHeaders(request);
+        setHeaders(request, compressedBodyBytes != null);
 
         return request.execute();
     }
 
     /**
-     * Same as {@link HttpClient#send(List)} but with a single
-     * {@link NewRelicLogRecord}.
-     *
-     * @param event {@link NewRelicLogRecord} object.
+     * Utility method to get payload string in JSON format, from a list of {@link NewRelicLogRecord}s.
      */
-    public HttpResponse send(NewRelicLogRecord event) throws IOException {
-        return this.send(ImmutableList.of(event));
+    private String toJsonString(List<NewRelicLogRecord> logRecords) {
+        return GSON.toJsonTree(logRecords, new TypeToken<List<NewRelicLogRecord>>() {}.getType()).toString();
     }
 
-    /**
-     * Shutsdown connection manager and releases all resources.
-     */
-    public void close() throws IOException {
-        if (transport != null) {
-            LOG.info("Closing publisher transport.");
-            transport.shutdown();
+    private static byte[] compress(final byte[] uncompressedBytes) {
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+
+        try (final GZIPOutputStream gzipOut = new GZIPOutputStream(bytesOut)) {
+            gzipOut.write(uncompressedBytes);
+            return bytesOut.toByteArray();
+        } catch (IOException e) {
+            LOG.warn("Couldn't compress byte stream", e);
+            return null;
         }
     }
 
@@ -189,50 +195,20 @@ public class HttpClient {
      *
      * @param request {@link HttpRequest} object to add headers to.
      */
-    private void setHeaders(HttpRequest request) {
+    private void setHeaders(final HttpRequest request, final boolean includeGzipHeader) {
         request.getHeaders().set("Api-Key", apiKey);
-        if (useCompression) {
+        if (includeGzipHeader) {
             request.getHeaders().set("Content-Encoding", "gzip");
         }
     }
 
     /**
-     * Utility method to marshall a list of {@link NewRelicLogRecord}s into an
-     * {@link HttpContent} object that can be used to create an {@link HttpRequest}.
-     *
-     * @param events List of {@link NewRelicLogRecord}s
-     * @return {@link HttpContent} that can be used to create an
-     * {@link HttpRequest}.
+     * Shuts down the HTTP client
      */
-    private HttpContent getContent(List<NewRelicLogRecord> events) {
-        String payload = getStringPayload(events);
-        // LOG.debug("Payload content: {}", payload);
-
-        if (useCompression) {
-            byte[] bytes = StringUtils.getBytesUtf8(payload);
-            ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-
-            try (GZIPOutputStream gzipOut = new GZIPOutputStream(bytesOut)) {
-                gzipOut.write(bytes);
-                gzipOut.close();
-                return new ByteArrayContent("application/gzip", bytesOut.toByteArray());
-            } catch (IOException e) {
-                LOG.warn("Couldn't gzip byte stream", e);
-                return new ByteArrayContent("application/json", StringUtils.getBytesUtf8(payload));
-            }
-        } else {
-            return new ByteArrayContent("application/json", StringUtils.getBytesUtf8(payload));
+    public void close() throws IOException {
+        if (transport != null) {
+            LOG.info("Closing http client transport.");
+            transport.shutdown();
         }
-    }
-
-    /**
-     * Utility method to get payload string from a list of {@link NewRelicLogRecord}s.
-     */
-    private String getStringPayload(List<NewRelicLogRecord> events) {
-        StringBuilder sb = new StringBuilder();
-        sb.append('[');
-        events.forEach(event -> sb.append(GSON.toJson(event)).append(','));
-        sb.setCharAt(sb.length() - 1, ']');
-        return sb.toString();
     }
 }

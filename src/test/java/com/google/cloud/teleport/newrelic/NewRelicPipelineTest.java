@@ -136,6 +136,8 @@ public class NewRelicPipelineTest {
 
     // TODO Test to check compression: check
 
+    // TODO Check max payload size (1MB) allowed by Vortex
+
     // TODO Test to check deadlettering: sending 2 messages with a batching of 1 and creating an expectation in the
     // MockServer that rejects the message with a 500 if the message content equals BLA. We ensure that the
     // rejected message ends up in the deadletter queue
