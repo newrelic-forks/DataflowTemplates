@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.google.cloud.teleport.newrelic;
+package com.google.cloud.teleport.newrelic.dofns;
 
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpResponseException;
+import com.google.cloud.teleport.newrelic.utils.HttpClient;
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.beam.sdk.metrics.Counter;
@@ -44,12 +44,7 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -62,16 +57,16 @@ import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Prec
 /**
  * A {@link DoFn} to write {@link NewRelicLogRecord}s to NewRelic's log API endpoint.
  */
-public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, NewRelicLogApiSendError> {
+public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecord>, NewRelicLogApiSendError> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(NewRelicEventWriter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NewRelicLogRecordWriterFn.class);
     private static final int DEFAULT_BATCH_COUNT = 1;
     private static final boolean DEFAULT_DISABLE_CERTIFICATE_VALIDATION = false;
     private static final boolean DEFAULT_USE_COMPRESSION = true;
     private static final long DEFAULT_FLUSH_DELAY = 2;
-    private static final Counter INPUT_COUNTER = Metrics.counter(NewRelicEventWriter.class, "inbound-events");
-    private static final Counter SUCCESS_WRITES = Metrics.counter(NewRelicEventWriter.class, "outbound-successful-events");
-    private static final Counter FAILED_WRITES = Metrics.counter(NewRelicEventWriter.class, "outbound-failed-events");
+    private static final Counter INPUT_COUNTER = Metrics.counter(NewRelicLogRecordWriterFn.class, "inbound-events");
+    private static final Counter SUCCESS_WRITES = Metrics.counter(NewRelicLogRecordWriterFn.class, "outbound-successful-events");
+    private static final Counter FAILED_WRITES = Metrics.counter(NewRelicLogRecordWriterFn.class, "outbound-failed-events");
     private static final String BUFFER_STATE_NAME = "buffer";
     private static final String COUNT_STATE_NAME = "count";
     private static final String TIME_ID_NAME = "expiry";
@@ -97,7 +92,7 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     private final ValueProvider<Integer> inputBatchCount;
     private final ValueProvider<Boolean> inputUseCompression;
 
-    public NewRelicEventWriter(final NewRelicConfig newRelicConfig) {
+    public NewRelicLogRecordWriterFn(final NewRelicConfig newRelicConfig) {
         this.url = newRelicConfig.getUrl();
         this.apiKey = newRelicConfig.getApiKey();
         this.inputDisableCertificateValidation = newRelicConfig.getDisableCertificateValidation();

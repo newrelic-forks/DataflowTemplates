@@ -1,4 +1,4 @@
-package com.google.cloud.teleport.newrelic;
+package com.google.cloud.teleport.newrelic.utils;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -27,11 +27,7 @@ import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.HostnameVerifier;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.ImmutableList;
 import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.ImmutableSet;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;

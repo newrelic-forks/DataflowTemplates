@@ -1,7 +1,7 @@
 package com.google.cloud.teleport.newrelic.ptransforms;
 
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
-import com.google.cloud.teleport.newrelic.NewRelicEventWriter;
+import com.google.cloud.teleport.newrelic.dofns.NewRelicLogRecordWriterFn;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogApiSendErrorCoder;
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
@@ -31,7 +31,7 @@ public class NewRelicIO extends PTransform<PCollection<NewRelicLogRecord>, PColl
     public PCollection<NewRelicLogApiSendError> expand(PCollection<NewRelicLogRecord> input) {
 
         LOG.info("Configuring NewRelicEventWriter.");
-        NewRelicEventWriter writer = new NewRelicEventWriter(newRelicConfig);
+        NewRelicLogRecordWriterFn writer = new NewRelicLogRecordWriterFn(newRelicConfig);
         LOG.info("NewRelicEventWriter configured");
 
         // Return a PCollection<NewRelicWriteError>

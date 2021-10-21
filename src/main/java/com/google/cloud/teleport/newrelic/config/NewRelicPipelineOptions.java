@@ -1,12 +1,13 @@
 package com.google.cloud.teleport.newrelic.config;
 
+import com.google.cloud.teleport.newrelic.dofns.NewRelicLogRecordWriterFn;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.ValueProvider;
 
 /**
  * The {@link NewRelicPipelineOptions} class provides the custom options passed by the executor at the command line
- * to configure the pipeline that process PubSub data and sends it to NR using {@link com.google.cloud.teleport.newrelic.NewRelicEventWriter}.
+ * to configure the pipeline that process PubSub data and sends it to NR using {@link NewRelicLogRecordWriterFn}.
  */
 public interface NewRelicPipelineOptions extends PipelineOptions {
     @Description("NewRelic insert API key.")
