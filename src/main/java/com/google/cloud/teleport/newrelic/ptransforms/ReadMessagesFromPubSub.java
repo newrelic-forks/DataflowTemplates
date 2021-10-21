@@ -1,4 +1,4 @@
-package com.google.cloud.teleport.newrelic.transforms;
+package com.google.cloud.teleport.newrelic.ptransforms;
 
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubMessage;

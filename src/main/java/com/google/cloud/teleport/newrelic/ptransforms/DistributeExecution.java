@@ -1,4 +1,4 @@
-package com.google.cloud.teleport.newrelic.transforms;
+package com.google.cloud.teleport.newrelic.ptransforms;
 
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogRecordCoder;

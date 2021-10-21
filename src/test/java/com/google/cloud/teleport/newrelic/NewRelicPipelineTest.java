@@ -1,7 +1,7 @@
 package com.google.cloud.teleport.newrelic;
 
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
-import com.google.cloud.teleport.newrelic.transforms.NewRelicIO;
+import com.google.cloud.teleport.newrelic.ptransforms.NewRelicIO;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.transforms.Create;

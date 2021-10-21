@@ -1,18 +1,15 @@
-package com.google.cloud.teleport.newrelic.transforms;
+package com.google.cloud.teleport.newrelic.ptransforms;
 
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.NewRelicEventWriter;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogApiSendErrorCoder;
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
-import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.PCollection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Objects;
 
 /**
  * Class {@link NewRelicIO} provides a {@link PTransform} that allows writing {@link NewRelicLogRecord}

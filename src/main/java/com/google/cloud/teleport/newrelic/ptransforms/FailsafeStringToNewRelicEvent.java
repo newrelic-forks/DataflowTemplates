@@ -1,4 +1,4 @@
-package com.google.cloud.teleport.newrelic.transforms;
+package com.google.cloud.teleport.newrelic.ptransforms;
 
 import com.google.api.client.util.DateTime;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;

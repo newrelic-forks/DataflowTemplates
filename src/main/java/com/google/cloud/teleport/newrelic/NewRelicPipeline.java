@@ -4,7 +4,7 @@ import com.google.cloud.teleport.coders.FailsafeElementCoder;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogRecordCoder;
-import com.google.cloud.teleport.newrelic.transforms.FailsafeStringToNewRelicEvent;
+import com.google.cloud.teleport.newrelic.ptransforms.FailsafeStringToNewRelicEvent;
 import com.google.cloud.teleport.values.FailsafeElement;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
