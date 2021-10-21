@@ -33,12 +33,13 @@ import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 public class NewRelicPipelineTest {
 
     @Rule
-    public final transient TestPipeline testPipeline = TestPipeline.create();
+    public final TestPipeline testPipeline = TestPipeline.create();
     private final String EXPECTED_PATH = "/log/v1";
     private final String API_KEY = "an-api-key";
 
     private MockServerClient mockServerClient;
     private String url;
+
     @Before
     public void setUp() throws Exception {
         try {
@@ -86,8 +87,8 @@ public class NewRelicPipelineTest {
 
     private NewRelicConfig getNewRelicConfig(final String url, final Integer batchCount, final Integer parallelism, final Boolean useCompression) {
         final NewRelicConfig newRelicConfig = mock(NewRelicConfig.class);
-        when(newRelicConfig.getUrl()).thenReturn(ValueProvider.StaticValueProvider.of(url));
-        when(newRelicConfig.getApiKey()).thenReturn(ValueProvider.StaticValueProvider.of(API_KEY));
+        when(newRelicConfig.getLogsApiUrl()).thenReturn(ValueProvider.StaticValueProvider.of(url));
+        when(newRelicConfig.getLicenseKey()).thenReturn(ValueProvider.StaticValueProvider.of(API_KEY));
         when(newRelicConfig.getBatchCount()).thenReturn(ValueProvider.StaticValueProvider.of(batchCount));
         when(newRelicConfig.getParallelism()).thenReturn(ValueProvider.StaticValueProvider.of(parallelism));
         when(newRelicConfig.getDisableCertificateValidation()).thenReturn(ValueProvider.StaticValueProvider.of(false));
@@ -97,7 +98,7 @@ public class NewRelicPipelineTest {
     }
 
     @Test
-    public void testPubSubMessagesAreSentToNewRelicUsingDefaultsValues() {
+    public void testPubSubMessagesAreSentToNewRelicUsingDefaultValues() {
         mockServerClient
                 .when(HttpRequest.request(EXPECTED_PATH))
                 .respond(HttpResponse.response().withStatusCode(202));

@@ -11,6 +11,10 @@ import org.apache.beam.sdk.values.PCollection;
 
 import java.nio.charset.StandardCharsets;
 
+/**
+ * This PTransform reads messages from a PubSub subscription and returns a PCollection of Strings, each of which
+ * represent the original "data" field of the PubSub message, base64-decoded.
+ */
 public class ReadMessagesFromPubSub extends PTransform<PBegin, PCollection<String>> {
 
     private final ValueProvider<String> subscriptionName;

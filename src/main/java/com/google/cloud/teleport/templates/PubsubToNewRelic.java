@@ -14,9 +14,9 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 
 /**
  * The {@link PubsubToNewRelic} pipeline is a streaming pipeline which ingests data from Cloud
- * Pub/Sub, executes a UDF, converts the output to {@link NewRelicLogRecord}s and writes those records
- * into NewRelic's API endpoint. Any errors which occur in the execution of the UDF, conversion to
- * {@link NewRelicLogRecord} or writing to API will be streamed into a Pub/Sub topic.
+ * Pub/Sub, converts the output to {@link NewRelicLogRecord}s and writes those records
+ * into NewRelic's API endpoint. Any log records that experience an error when being converted to
+ * {@link NewRelicLogRecord} or when being sent to the New Relic Logs API will be streamed into a deadletter Pub/Sub topic.
  *
  * <p><b>Pipeline Requirements</b>
  *
@@ -60,7 +60,7 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
  *
  * NR_LOG_ENDPOINT=https://log-api.newrelic.com/log/v1
  *
- * NR_API_KEY=YOUR NEW RELIC API KEY
+ * NR_LICENSE_KEY=YOUR NEW RELIC LICENSE KEY
  *
  *
  * # Execute the templated pipeline:
@@ -69,12 +69,12 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
  * --region=${REGION} \
  * --parameters \
  * "inputSubscription=projects/${PROJECT_ID}/subscriptions/${INPUT_SUB_NAME},\
- * apiKey=${NR_API_KEY},\
- * url=${NR_LOG_ENDPOINT},\
+ * licenseKey=${NR_LICENSE_KEY},\
+ * logsApiUrl=${NR_LOG_ENDPOINT},\
  * batchCount=${BATCH_COUNT},\
  * parallelism=${PARALLELISM},\
  * disableCertificateValidation=false,\
- * outputDeadletterTopic=projects/${PROJECT_ID}/topics/${DEADLETTER_TOPIC_NAME}"
+ * useCompression=true"
  * </pre>
  */
 public class PubsubToNewRelic {

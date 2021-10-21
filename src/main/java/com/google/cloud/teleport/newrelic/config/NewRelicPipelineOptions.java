@@ -10,15 +10,15 @@ import org.apache.beam.sdk.options.ValueProvider;
  * to configure the pipeline that process PubSub data and sends it to NR using {@link NewRelicLogRecordWriterFn}.
  */
 public interface NewRelicPipelineOptions extends PipelineOptions {
-    @Description("NewRelic insert API key.")
-    ValueProvider<String> getApiKey();
+    @Description("New Relic license key.")
+    ValueProvider<String> getLicenseKey();
 
-    void setApiKey(ValueProvider<String> apiKey);
+    void setLicenseKey(ValueProvider<String> licenseKey);
 
-    @Description("NewRelic log api url. This should be routable from the VPC in which the Dataflow pipeline runs.")
-    ValueProvider<String> getUrl();
+    @Description("New Relic Logs API url. This should be routable from the VPC in which the Dataflow pipeline runs.")
+    ValueProvider<String> getLogsApiUrl();
 
-    void setUrl(ValueProvider<String> url);
+    void setLogsApiUrl(ValueProvider<String> logsApiUrl);
 
     @Description("Batch count for sending multiple events to NewRelic in a single POST.")
     ValueProvider<Integer> getBatchCount();
@@ -41,7 +41,7 @@ public interface NewRelicPipelineOptions extends PipelineOptions {
 
     void setTokenKMSEncryptionKey(ValueProvider<String> keyName);
 
-    @Description("True to gzip payloads to log API.")
+    @Description("True to compress (in GZIP) the payloads sent to the New Relic Logs API.")
     ValueProvider<Boolean> getUseCompression();
 
     void setUseCompression(ValueProvider<Boolean> useCompression);

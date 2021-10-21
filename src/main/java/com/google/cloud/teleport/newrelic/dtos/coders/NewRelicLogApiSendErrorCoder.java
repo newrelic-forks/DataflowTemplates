@@ -14,19 +14,19 @@ import java.io.OutputStream;
 
 /**
  * A {@link org.apache.beam.sdk.coders.Coder} for {@link NewRelicLogApiSendError} objects. It allows serializing and
- *  * deserializing {@link NewRelicLogApiSendError} objects, which can then be transmitted through a Beam pipeline using
- *  * PCollection/PCollectionTuple objects.
+ * deserializing {@link NewRelicLogApiSendError} objects, which can then be transmitted through a Beam pipeline using
+ * PCollection/PCollectionTuple objects.
  */
 public class NewRelicLogApiSendErrorCoder extends AtomicCoder<NewRelicLogApiSendError> {
 
-    private static final NewRelicLogApiSendErrorCoder NewRelic_WRITE_ERROR_CODER = new NewRelicLogApiSendErrorCoder();
+    private static final NewRelicLogApiSendErrorCoder SINGLETON = new NewRelicLogApiSendErrorCoder();
     private static final TypeDescriptor<NewRelicLogApiSendError> TYPE_DESCRIPTOR = new TypeDescriptor<NewRelicLogApiSendError>() {};
     private static final StringUtf8Coder STRING_UTF_8_CODER = StringUtf8Coder.of();
     private static final NullableCoder<String> STRING_NULLABLE_CODER = NullableCoder.of(STRING_UTF_8_CODER);
     private static final NullableCoder<Integer> INTEGER_NULLABLE_CODER = NullableCoder.of(BigEndianIntegerCoder.of());
 
     public static NewRelicLogApiSendErrorCoder of() {
-        return NewRelic_WRITE_ERROR_CODER;
+        return SINGLETON;
     }
 
     @Override

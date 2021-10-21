@@ -33,13 +33,13 @@ import org.apache.beam.sdk.values.TypeDescriptor;
  */
 public class NewRelicLogRecordCoder extends AtomicCoder<NewRelicLogRecord> {
 
-    private static final NewRelicLogRecordCoder EVENT_CODER = new NewRelicLogRecordCoder();
+    private static final NewRelicLogRecordCoder SINGLETON = new NewRelicLogRecordCoder();
     private static final TypeDescriptor<NewRelicLogRecord> TYPE_DESCRIPTOR = new TypeDescriptor<NewRelicLogRecord>() {};
     private static final StringUtf8Coder STRING_UTF_8_CODER = StringUtf8Coder.of();
     private static final NullableCoder<Long> LONG_NULLABLE_CODER = NullableCoder.of(BigEndianLongCoder.of());
 
     public static NewRelicLogRecordCoder of() {
-        return EVENT_CODER;
+        return SINGLETON;
     }
 
     @Override

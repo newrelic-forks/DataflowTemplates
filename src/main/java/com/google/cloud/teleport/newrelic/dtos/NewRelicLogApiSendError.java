@@ -1,13 +1,13 @@
 package com.google.cloud.teleport.newrelic.dtos;
 
 /**
- * A class for capturing errors when sending {@link NewRelicLogRecord}s to NewRelic's Log API end point.
+ * A class for capturing errors when sending {@link NewRelicLogRecord}s to New Relic's Logs API end point.
  */
 public class NewRelicLogApiSendError {
 
     /** Status code returned by the Logs API */
     private Integer statusCode;
-    /** Status message returned by the Logs API */
+    /** Status message returned by the Logs API, or message returned by any thrown exception */
     private String statusMessage;
     /** A JSON representation of the log record that was sent (but failed to be accepted) to the Logs API. */
     private String payload;

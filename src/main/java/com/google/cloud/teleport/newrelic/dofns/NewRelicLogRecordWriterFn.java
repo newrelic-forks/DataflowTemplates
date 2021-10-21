@@ -55,7 +55,7 @@ import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Prec
 import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * A {@link DoFn} to write {@link NewRelicLogRecord}s to NewRelic's log API endpoint.
+ * A {@link DoFn} to write {@link NewRelicLogRecord}s to New Relic's log API endpoint.
  */
 public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecord>, NewRelicLogApiSendError> {
 
@@ -86,15 +86,15 @@ public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecor
     private HttpClient httpClient;
 
     // Serialized fields
-    private final ValueProvider<String> url;
+    private final ValueProvider<String> logsApiUrl;
     private final ValueProvider<String> apiKey;
     private final ValueProvider<Boolean> inputDisableCertificateValidation;
     private final ValueProvider<Integer> inputBatchCount;
     private final ValueProvider<Boolean> inputUseCompression;
 
     public NewRelicLogRecordWriterFn(final NewRelicConfig newRelicConfig) {
-        this.url = newRelicConfig.getUrl();
-        this.apiKey = newRelicConfig.getApiKey();
+        this.logsApiUrl = newRelicConfig.getLogsApiUrl();
+        this.apiKey = newRelicConfig.getLicenseKey();
         this.inputDisableCertificateValidation = newRelicConfig.getDisableCertificateValidation();
         this.inputBatchCount = newRelicConfig.getBatchCount();
         this.inputUseCompression = newRelicConfig.getUseCompression();
@@ -102,8 +102,7 @@ public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecor
 
     @Setup
     public void setup() {
-
-        checkArgument(url != null && url.isAccessible(), "url is required for writing events.");
+        checkArgument(logsApiUrl != null && logsApiUrl.isAccessible(), "url is required for writing events.");
         checkArgument(apiKey != null && apiKey.isAccessible(), "API key is required for writing events.");
 
         batchCount = valueOrDefault (inputBatchCount, DEFAULT_BATCH_COUNT);
@@ -117,7 +116,7 @@ public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecor
 
         try {
             this.httpClient = HttpClient.init(
-                    new GenericUrl(url.get()),
+                    new GenericUrl(logsApiUrl.get()),
                     apiKey.get(),
                     disableCertificateValidation,
                     useCompression);
@@ -138,9 +137,9 @@ public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecor
             @TimerId(TIME_ID_NAME) Timer timer) throws IOException {
 
         Long count = MoreObjects.<Long>firstNonNull(countState.read(), 0L);
-        NewRelicLogRecord event = input.getValue();
+        final NewRelicLogRecord logRecord = input.getValue();
         INPUT_COUNTER.inc();
-        bufferState.add(event);
+        bufferState.add(logRecord);
         count += 1;
         countState.write(count);
         timer.offset(Duration.standardSeconds(DEFAULT_FLUSH_DELAY)).setRelative();
@@ -175,7 +174,7 @@ public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecor
         if (!bufferState.isEmpty().read()) {
             // Important to close this response to avoid connection leak.
             HttpResponse response = null;
-            List<NewRelicLogRecord> logRecords = ImmutableList.copyOf(bufferState.read());
+            final List<NewRelicLogRecord> logRecords = ImmutableList.copyOf(bufferState.read());
             try {
                 final long startTime = System.currentTimeMillis();
                 response = httpClient.send(logRecords);

@@ -28,13 +28,13 @@ public class NewRelicPipeline {
     /**
      * The tag for successful {@link NewRelicLogRecord} conversion.
      */
-    private static final TupleTag<NewRelicLogRecord> NewRelic_EVENT_OUT = new TupleTag<NewRelicLogRecord>() {
+    private static final TupleTag<NewRelicLogRecord> SUCCESSFUL_CONVERSIONS = new TupleTag<NewRelicLogRecord>() {
     };
 
     /**
      * The tag for failed {@link NewRelicLogRecord} conversion.
      */
-    private static final TupleTag<FailsafeElement<String, String>> NewRelic_EVENT_DEADLETTER_OUT =
+    private static final TupleTag<FailsafeElement<String, String>> FAILED_CONVERSIONS =
             new TupleTag<FailsafeElement<String, String>>() {
             };
 
@@ -64,29 +64,25 @@ public class NewRelicPipeline {
         // Register New relic amd failsafe coders.
         CoderRegistry registry = pipeline.getCoderRegistry();
         registry.registerCoderForClass(NewRelicLogRecord.class, NewRelicLogRecordCoder.of());
-        registry.registerCoderForType(
-                FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor(), FAILSAFE_ELEMENT_CODER);
+        registry.registerCoderForType(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor(), FAILSAFE_ELEMENT_CODER);
 
         // 1) Read messages in from Pub/Sub
-        PCollection<String> stringMessages =
-                pipeline.apply("Read messages from subscription",
-                        pubsubMessageReaderTransform);
+        PCollection<String> stringMessages = pipeline.apply("Read messages from subscription", pubsubMessageReaderTransform);
 
         // 2) Convert message to FailsafeElement for processing.
         PCollection<FailsafeElement<String, String>> transformedOutput =
-                stringMessages
-                        .apply("Transform to Failsafe Element",
-                                MapElements.into(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor())
-                                        .via(input -> FailsafeElement.of(input, input)));
+                stringMessages.apply(
+                        "Transform to Failsafe Element",
+                        MapElements.into(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor())
+                                .via(input -> FailsafeElement.of(input, input)));
 
         // 3) Convert successfully transformed messages into NewRelicEvent objects
         PCollectionTuple convertToEventTuple = transformedOutput
-                .apply("Transform to NewRelicLogRecord", FailsafeStringToNewRelicEvent.withOutputTags(
-                        NewRelic_EVENT_OUT, NewRelic_EVENT_DEADLETTER_OUT));
+                .apply("Transform to NewRelicLogRecord", FailsafeStringToNewRelicEvent.withOutputTags(SUCCESSFUL_CONVERSIONS, FAILED_CONVERSIONS));
 
         // 4) Write NewRelicEvents to NewRelic's Log API end point.
         convertToEventTuple
-                .get(NewRelic_EVENT_OUT)
+                .get(SUCCESSFUL_CONVERSIONS)
                 .apply("Forward logs to New Relic", newrelicMessageWriterTransform);
 
         return pipeline.run();

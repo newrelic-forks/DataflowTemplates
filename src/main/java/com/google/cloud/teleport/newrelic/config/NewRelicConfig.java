@@ -3,22 +3,27 @@ package com.google.cloud.teleport.newrelic.config;
 import com.google.cloud.teleport.util.KMSEncryptedNestedValueProvider;
 import org.apache.beam.sdk.options.ValueProvider;
 
+/**
+ * The NewRelicConfig contains the {@link NewRelicPipelineOptions} that were supplied
+ * when starting the Apache Beam job, and which will be used by the {@link com.google.cloud.teleport.newrelic.ptransforms.NewRelicIO}
+ * transform to conveniently batch and send the processed logs to New Relic Logs
+ */
 public class NewRelicConfig {
-    private final ValueProvider<String> url;
-    private final ValueProvider<String> apiKey;
+    private final ValueProvider<String> logsApiUrl;
+    private final ValueProvider<String> licenseKey;
     private final ValueProvider<Integer> batchCount;
     private final ValueProvider<Integer> parallelism;
     private final ValueProvider<Boolean> disableCertificateValidation;
     private final ValueProvider<Boolean> useCompression;
 
-    private NewRelicConfig(final ValueProvider<String> url,
-                           final ValueProvider<String> apiKey,
+    private NewRelicConfig(final ValueProvider<String> logsApiUrl,
+                           final ValueProvider<String> licenseKey,
                            final ValueProvider<Integer> batchCount,
                            final ValueProvider<Integer> parallelism,
                            final ValueProvider<Boolean> disableCertificateValidation,
                            final ValueProvider<Boolean> useCompression) {
-        this.url = url;
-        this.apiKey = apiKey;
+        this.logsApiUrl = logsApiUrl;
+        this.licenseKey = licenseKey;
         this.batchCount = batchCount;
         this.parallelism = parallelism;
         this.disableCertificateValidation = disableCertificateValidation;
@@ -27,10 +32,10 @@ public class NewRelicConfig {
 
     public static NewRelicConfig fromPipelineOptions(final NewRelicPipelineOptions newRelicOptions) {
         return new NewRelicConfig(
-                newRelicOptions.getUrl(),
+                newRelicOptions.getLogsApiUrl(),
                 newRelicOptions.getTokenKMSEncryptionKey().isAccessible()
-                        ? maybeDecrypt(newRelicOptions.getApiKey(), newRelicOptions.getTokenKMSEncryptionKey())
-                        : newRelicOptions.getApiKey(),
+                        ? maybeDecrypt(newRelicOptions.getLicenseKey(), newRelicOptions.getTokenKMSEncryptionKey())
+                        : newRelicOptions.getLicenseKey(),
                 newRelicOptions.getBatchCount(),
                 newRelicOptions.getParallelism(),
                 newRelicOptions.getDisableCertificateValidation(),
@@ -49,12 +54,12 @@ public class NewRelicConfig {
         return new KMSEncryptedNestedValueProvider(unencryptedToken, kmsKey);
     }
 
-    public ValueProvider<String> getUrl() {
-        return url;
+    public ValueProvider<String> getLogsApiUrl() {
+        return logsApiUrl;
     }
 
-    public ValueProvider<String> getApiKey() {
-        return apiKey;
+    public ValueProvider<String> getLicenseKey() {
+        return licenseKey;
     }
 
     public ValueProvider<Integer> getBatchCount() {

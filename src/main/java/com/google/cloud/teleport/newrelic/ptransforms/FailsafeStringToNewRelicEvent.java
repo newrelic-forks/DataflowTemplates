@@ -19,23 +19,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@link PTransform}s messages (either as plain strings or as JSON strings) to {@link NewRelicLogRecord}s
+ * Transforms messages (either as plain strings or as JSON strings) to {@link NewRelicLogRecord}s
  */
-public class FailsafeStringToNewRelicEvent
-        extends PTransform<PCollection<FailsafeElement<String, String>>, PCollectionTuple> {
+public class FailsafeStringToNewRelicEvent extends PTransform<PCollection<FailsafeElement<String, String>>, PCollectionTuple> {
 
     private static final Logger LOG = LoggerFactory.getLogger(FailsafeStringToNewRelicEvent.class);
     private static final String TIMESTAMP_KEY = "timestamp";
     private static final Counter CONVERSION_ERRORS = Metrics.counter(FailsafeStringToNewRelicEvent.class, "newrelic-event-conversion-errors");
     private static final Counter CONVERSION_SUCCESS = Metrics.counter(FailsafeStringToNewRelicEvent.class, "newrelic-event-conversion-successes");
 
-    private TupleTag<NewRelicLogRecord> eventOutputTag;
-    private TupleTag<FailsafeElement<String, String>> deadletterTag;
+    private TupleTag<NewRelicLogRecord> successfulConversionsTag;
+    private TupleTag<FailsafeElement<String, String>> failedConversionsTag;
 
-    private FailsafeStringToNewRelicEvent(TupleTag<NewRelicLogRecord> eventOutputTag,
-                                          TupleTag<FailsafeElement<String, String>> deadletterTag) {
-        this.eventOutputTag = eventOutputTag;
-        this.deadletterTag = deadletterTag;
+    private FailsafeStringToNewRelicEvent(TupleTag<NewRelicLogRecord> successfulConversionsTag,
+                                          TupleTag<FailsafeElement<String, String>> failedConversionsTag) {
+        this.successfulConversionsTag = successfulConversionsTag;
+        this.failedConversionsTag = failedConversionsTag;
     }
 
     /**
@@ -44,27 +43,24 @@ public class FailsafeStringToNewRelicEvent
      * objects. Any conversion errors are wrapped into a {@link FailsafeElement}
      * with appropriate error information.
      *
-     * @param nrEventOutputTag {@link TupleTag} to use for successfully converted
-     *                         messages.
-     * @param nrDeadletterTag  {@link TupleTag} to use for messages that failed
-     *                         conversion.
+     * @param successfulConversionsTag {@link TupleTag} to use for successfully converted messages.
+     * @param failedConversionsTag     {@link TupleTag} to use for messages that failed conversion.
      */
-    public static FailsafeStringToNewRelicEvent withOutputTags(TupleTag<NewRelicLogRecord> nrEventOutputTag,
-                                                               TupleTag<FailsafeElement<String, String>> nrDeadletterTag) {
-        return new FailsafeStringToNewRelicEvent(nrEventOutputTag, nrDeadletterTag);
+    public static FailsafeStringToNewRelicEvent withOutputTags(TupleTag<NewRelicLogRecord> successfulConversionsTag,
+                                                               TupleTag<FailsafeElement<String, String>> failedConversionsTag) {
+        return new FailsafeStringToNewRelicEvent(successfulConversionsTag, failedConversionsTag);
     }
 
     @Override
     public PCollectionTuple expand(PCollection<FailsafeElement<String, String>> input) {
 
-        return input.apply("ConvertToNewRelicEvent", ParDo.of(new DoFn<FailsafeElement<String, String>, NewRelicLogRecord>() {
+        return input.apply("Convert to NewRelicLogRecord", ParDo.of(new DoFn<FailsafeElement<String, String>, NewRelicLogRecord>() {
 
             @ProcessElement
             public void processElement(
                     @Element FailsafeElement<String, String> inputElement,
                     MultiOutputReceiver outputReceivers
             ) {
-
                 final String input = inputElement.getPayload();
 
                 try {
@@ -78,11 +74,9 @@ public class FailsafeStringToNewRelicEvent
                     // present in Stackdriver's LogEntry structure (timestamp) or
                     // a user provided _metadata field.
                     try {
-
                         JSONObject json = new JSONObject(input);
 
                         String parsedTimestamp = json.optString(TIMESTAMP_KEY);
-
                         if (!parsedTimestamp.isEmpty()) {
                             try {
                                 nrEvent.setTimestamp(DateTime.parseRfc3339(parsedTimestamp).getValue());
@@ -91,7 +85,6 @@ public class FailsafeStringToNewRelicEvent
                                 LOG.debug("Unable to parse non-rfc3339 formatted timestamp: {}", parsedTimestamp);
                             }
                         }
-
                     } catch (JSONException je) {
                         // input is either not a properly formatted JSONObject
                         // or has other exceptions. In this case, we will
@@ -103,15 +96,15 @@ public class FailsafeStringToNewRelicEvent
                         // this is expected behavior.
                     }
 
-                    outputReceivers.get(eventOutputTag).output(nrEvent);
+                    outputReceivers.get(successfulConversionsTag).output(nrEvent);
                     CONVERSION_SUCCESS.inc();
 
                 } catch (Exception e) {
                     CONVERSION_ERRORS.inc();
-                    outputReceivers.get(deadletterTag).output(FailsafeElement.of(input, input).setErrorMessage(e.getMessage())
+                    outputReceivers.get(failedConversionsTag).output(FailsafeElement.of(input, input).setErrorMessage(e.getMessage())
                             .setStacktrace(Throwables.getStackTraceAsString(e)));
                 }
             }
-        }).withOutputTags(eventOutputTag, TupleTagList.of(deadletterTag)));
+        }).withOutputTags(successfulConversionsTag, TupleTagList.of(failedConversionsTag)));
     }
 }
