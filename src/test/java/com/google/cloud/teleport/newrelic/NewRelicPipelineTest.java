@@ -39,7 +39,6 @@ public class NewRelicPipelineTest {
 
     private MockServerClient mockServerClient;
     private String url;
-
     @Before
     public void setUp() throws Exception {
         try {
@@ -78,11 +77,9 @@ public class NewRelicPipelineTest {
                 "      \"message\" : \"" + StringEscapeUtils.escapeJava(jsonMessage) + "\",\n"
                 + "\"timestamp\" : " + messageTimestamp.toInstant(ZoneOffset.UTC).toEpochMilli() + "\n" +
                 "    } ]");
+
         mockServerClient.verify(
-                HttpRequest.request(EXPECTED_PATH)
-                        .withMethod("POST")
-                        .withHeader(Header.header("Content-Type", "application/json"))
-                        .withHeader(Header.header("api-key", API_KEY))
+                getRequestDefinition()
                         .withBody(JsonBody.json(expectedBody)),
                 VerificationTimes.once());
     }
@@ -97,6 +94,35 @@ public class NewRelicPipelineTest {
         when(newRelicConfig.getUseCompression()).thenReturn(ValueProvider.StaticValueProvider.of(useCompression));
 
         return newRelicConfig;
+    }
+
+    @Test
+    public void testPubSubMessagesAreSentToNewRelicUsingDefaultsValues() {
+        mockServerClient
+                .when(HttpRequest.request(EXPECTED_PATH))
+                .respond(HttpResponse.response().withStatusCode(202));
+
+        final String message = "A log message";
+        final LocalDateTime messageTimestamp = LocalDateTime.of(2021, Month.DECEMBER, 25, 23, 0, 0, 900);
+        final String jsonMessage = "{ \"message\": \"A JSON message\", \"timestamp\": \"" + messageTimestamp.toString() + "\"}";
+
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                Create.of(message, jsonMessage),
+                new NewRelicIO(getNewRelicConfig(url, null, 1, false)));
+
+        pipeline.run().waitUntilFinish(Duration.millis(100));
+
+        mockServerClient.verify(
+                getRequestDefinition(),
+                VerificationTimes.exactly(2));
+    }
+
+    private HttpRequest getRequestDefinition() {
+        return HttpRequest.request(EXPECTED_PATH)
+                .withMethod("POST")
+                .withHeader(Header.header("Content-Type", "application/json"))
+                .withHeader(Header.header("api-key", API_KEY));
     }
 
     // TODO Test that specifying null parameter options correctly use the default values (i.e. specifying null parallelism should result in parallelism=1)

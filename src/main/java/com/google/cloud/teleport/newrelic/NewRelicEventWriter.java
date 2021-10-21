@@ -23,6 +23,7 @@ import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -54,6 +55,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
+import static com.google.cloud.teleport.newrelic.utils.ConfigHelper.valueOrDefault;
 import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Preconditions.checkArgument;
 import static org.apache.beam.vendor.guava.v26_0_jre.com.google.common.base.Preconditions.checkNotNull;
 
@@ -113,19 +115,13 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
         checkArgument(url != null && url.isAccessible(), "url is required for writing events.");
         checkArgument(apiKey != null && apiKey.isAccessible(), "API key is required for writing events.");
 
-        batchCount = inputBatchCount != null && inputBatchCount.isAccessible()
-                ? inputBatchCount.get()
-                : DEFAULT_BATCH_COUNT;
+        batchCount = valueOrDefault (inputBatchCount, DEFAULT_BATCH_COUNT);
         LOG.info("Batch count set to: {}", batchCount);
 
-        disableCertificateValidation = inputDisableCertificateValidation != null && inputDisableCertificateValidation.isAccessible()
-                ? inputDisableCertificateValidation.get()
-                : DEFAULT_DISABLE_CERTIFICATE_VALIDATION;
+        disableCertificateValidation = valueOrDefault(inputDisableCertificateValidation, DEFAULT_DISABLE_CERTIFICATE_VALIDATION);
         LOG.info("Disable certificate validation set to: {}", disableCertificateValidation);
 
-        useCompression = inputUseCompression != null && inputUseCompression.isAccessible()
-                ? inputUseCompression.get()
-                : DEFAULT_USE_COMPRESSION;
+        useCompression = valueOrDefault(inputUseCompression, DEFAULT_USE_COMPRESSION);
         LOG.info("Use Compression set to: {}", useCompression);
 
         try {
@@ -143,6 +139,7 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
             throw new RuntimeException(e);
         }
     }
+
 
     @ProcessElement
     public void processElement(
@@ -204,7 +201,7 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
         if (!bufferState.isEmpty().read()) {
 
             HttpResponse response = null;
-            List<NewRelicLogRecord> events = Lists.newArrayList(bufferState.read());
+            List<NewRelicLogRecord> events = ImmutableList.copyOf(bufferState.read());
             try {
                 // Important to close this response to avoid connection leak.
                 final long startTime = System.currentTimeMillis();
