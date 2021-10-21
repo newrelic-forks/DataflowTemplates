@@ -13,18 +13,21 @@ import com.google.api.client.http.apache.v2.ApacheHttpTransport;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.StringUtils;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 import javax.net.ssl.HostnameVerifier;
+
 import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.ImmutableList;
+import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.ImmutableSet;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.conn.ssl.DefaultHostnameVerifier;
@@ -43,46 +46,36 @@ import org.slf4j.LoggerFactory;
  */
 public class HttpClient {
     private static final Logger LOG = LoggerFactory.getLogger(HttpClient.class);
-
     private static final int DEFAULT_MAX_CONNECTIONS = 1;
-
-    private static final Gson GSON = new GsonBuilder().setFieldNamingStrategy(f -> f.getName().toLowerCase()).create();
-
+    private static final Set<Integer> RETRYABLE_STATUS_CODES = ImmutableSet.of(408, 429, 500, 502, 503, 504, 599);
     private static final String HTTPS_PROTOCOL_PREFIX = "https";
+    private static final Gson GSON = new GsonBuilder().create();
+    private static final Integer MAX_ELAPSED_MILLIS = ExponentialBackOff.DEFAULT_MAX_ELAPSED_TIME_MILLIS;
+    private static final HttpBackOffUnsuccessfulResponseHandler RESPONSE_HANDLER;
 
-    private boolean useCompression;
+    static {
+        RESPONSE_HANDLER = new HttpBackOffUnsuccessfulResponseHandler(
+                new ExponentialBackOff.Builder().setMaxElapsedTimeMillis(MAX_ELAPSED_MILLIS).build()
+        );
+        RESPONSE_HANDLER.setBackOffRequired((HttpResponse response) -> RETRYABLE_STATUS_CODES.contains(response.getStatusCode()));
+    }
+
+    private final GenericUrl genericUrl;
+    private final String apiKey;
+    private final boolean useCompression;
     private ApacheHttpTransport transport;
     private HttpRequestFactory requestFactory;
-    private GenericUrl genericUrl;
-    private String apiKey;
-    private Integer maxElapsedMillis = ExponentialBackOff.DEFAULT_MAX_ELAPSED_TIME_MILLIS;
-    private Boolean disableCertificateValidation = false;
 
-
-    public void setTransport(ApacheHttpTransport transport) {
-        this.transport = transport;
-    }
-
-    public void setRequestFactory(HttpRequestFactory requestFactory) {
-        this.requestFactory = requestFactory;
-    }
-
-
-    public void setGenericUrl(GenericUrl genericUrl) {
+    private HttpClient(final GenericUrl genericUrl,
+                       final String apiKey,
+                       final Boolean useCompression,
+                       final ApacheHttpTransport transport,
+                       final HttpRequestFactory requestFactory) {
         this.genericUrl = genericUrl;
-    }
-
-    public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
-    }
-
-    public void setDisableCertificateValidation(Boolean disableCertificateValidation) {
-        this.disableCertificateValidation = disableCertificateValidation;
-    }
-
-
-    public void setUseCompression(Boolean useCompression) {
         this.useCompression = useCompression;
+        this.transport = transport;
+        this.requestFactory = requestFactory;
     }
 
     /**
@@ -90,38 +83,81 @@ public class HttpClient {
      *
      * @return {@link HttpClient}
      */
-    public void init() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+    public static HttpClient init(
+            final GenericUrl genericUrl,
+            final String apiKey,
+            final Boolean disableCertificateValidation,
+            final Boolean useCompression) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
 
         checkNotNull(apiKey, "API Key needs to be specified.");
         checkNotNull(genericUrl, "URL needs to be specified.");
 
         LOG.info("Certificate validation disabled: {}", disableCertificateValidation);
-        LOG.info("Defaulting max backoff time to: {} milliseconds ", maxElapsedMillis);
+        LOG.info("Defaulting max backoff time to: {} milliseconds ", MAX_ELAPSED_MILLIS);
 
-        CloseableHttpClient httpClient = getHttpClient(DEFAULT_MAX_CONNECTIONS, disableCertificateValidation);
+        CloseableHttpClient httpClient = getHttpClient(
+                genericUrl.getScheme().equalsIgnoreCase(HTTPS_PROTOCOL_PREFIX),
+                DEFAULT_MAX_CONNECTIONS,
+                disableCertificateValidation);
 
-        setTransport(new ApacheHttpTransport(httpClient));
-        setRequestFactory(transport.createRequestFactory());
+        final ApacheHttpTransport transport = new ApacheHttpTransport(httpClient);
+
+        return new HttpClient(
+                genericUrl,
+                apiKey,
+                useCompression,
+                transport,
+                transport.createRequestFactory());
+    }
+
+    /**
+     * Utility method to create a {@link CloseableHttpClient} to make http POSTs
+     * against New Relic API.
+     *
+     * @param useSsl                       use SSL in the established connection
+     * @param maxConnections               max number of parallel connections.
+     * @param disableCertificateValidation should disable certificate validation.
+     */
+    private static CloseableHttpClient getHttpClient(final boolean useSsl, int maxConnections, boolean disableCertificateValidation)
+            throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+
+        HttpClientBuilder builder = ApacheHttpTransport.newDefaultHttpClientBuilder();
+
+        if (useSsl) {
+            LOG.info("SSL connection requested");
+
+            HostnameVerifier hostnameVerifier = disableCertificateValidation ? NoopHostnameVerifier.INSTANCE
+                    : new DefaultHostnameVerifier();
+
+            SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
+            if (disableCertificateValidation) {
+                LOG.info("Certificate validation is disabled");
+                sslContextBuilder.loadTrustMaterial((TrustStrategy) (chain, authType) -> true);
+            }
+
+            SSLConnectionSocketFactory connectionSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build(),
+                    hostnameVerifier);
+            builder.setSSLSocketFactory(connectionSocketFactory);
+        }
+
+        builder.setMaxConnTotal(maxConnections);
+        builder.setDefaultRequestConfig(RequestConfig.custom().setCookieSpec(CookieSpecs.STANDARD).build());
+
+        return builder.build();
     }
 
     /**
      * Executes a POST for the list of {@link NewRelicLogRecord} objects into New
      * Relic's log API.
      *
-     * @param events List of {@link NewRelicLogRecord}s
+     * @param logRecords List of {@link NewRelicLogRecord}s
      * @return {@link HttpResponse} for the POST.
      */
-    public HttpResponse send(List<NewRelicLogRecord> events) throws IOException {
+    public HttpResponse send(final List<NewRelicLogRecord> logRecords) throws IOException {
+        final HttpContent content = getContent(logRecords);
 
-        HttpContent content = getContent(events);
-        HttpRequest request = requestFactory.buildPostRequest(genericUrl, content);
-
-        HttpBackOffUnsuccessfulResponseHandler responseHandler = new HttpBackOffUnsuccessfulResponseHandler(
-                getConfiguredBackOff());
-
-        responseHandler.setBackOffRequired(HttpBackOffUnsuccessfulResponseHandler.BackOffRequired.ON_SERVER_ERROR);
-
-        request.setUnsuccessfulResponseHandler(responseHandler);
+        final HttpRequest request = requestFactory.buildPostRequest(genericUrl, content);
+        request.setUnsuccessfulResponseHandler(RESPONSE_HANDLER);
         setHeaders(request);
 
         return request.execute();
@@ -138,16 +174,8 @@ public class HttpClient {
     }
 
     /**
-     * Return an {@link ExponentialBackOff} with the right settings.
-     *
-     * @return {@link ExponentialBackOff} object.
+     * Shutsdown connection manager and releases all resources.
      */
-    @VisibleForTesting
-    protected ExponentialBackOff getConfiguredBackOff() {
-        return new ExponentialBackOff.Builder().setMaxElapsedTimeMillis(maxElapsedMillis).build();
-    }
-
-    /** Shutsdown connection manager and releases all resources. */
     public void close() throws IOException {
         if (transport != null) {
             LOG.info("Closing publisher transport.");
@@ -163,7 +191,7 @@ public class HttpClient {
      */
     private void setHeaders(HttpRequest request) {
         request.getHeaders().set("Api-Key", apiKey);
-        if(useCompression) {
+        if (useCompression) {
             request.getHeaders().set("Content-Encoding", "gzip");
         }
     }
@@ -174,7 +202,7 @@ public class HttpClient {
      *
      * @param events List of {@link NewRelicLogRecord}s
      * @return {@link HttpContent} that can be used to create an
-     *         {@link HttpRequest}.
+     * {@link HttpRequest}.
      */
     private HttpContent getContent(List<NewRelicLogRecord> events) {
         String payload = getStringPayload(events);
@@ -207,40 +235,4 @@ public class HttpClient {
         sb.setCharAt(sb.length() - 1, ']');
         return sb.toString();
     }
-
-    /**
-     * Utility method to create a {@link CloseableHttpClient} to make http POSTs
-     * against Splunk's API.
-     *
-     * @param maxConnections               max number of parallel connections.
-     * @param disableCertificateValidation should disable certificate validation.
-     */
-    private CloseableHttpClient getHttpClient(int maxConnections, boolean disableCertificateValidation)
-            throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
-
-        HttpClientBuilder builder = ApacheHttpTransport.newDefaultHttpClientBuilder();
-
-        if (genericUrl.getScheme().equalsIgnoreCase(HTTPS_PROTOCOL_PREFIX)) {
-            LOG.info("SSL connection requested");
-
-            HostnameVerifier hostnameVerifier = disableCertificateValidation ? NoopHostnameVerifier.INSTANCE
-                    : new DefaultHostnameVerifier();
-
-            SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
-            if (disableCertificateValidation) {
-                LOG.info("Certificate validation is disabled");
-                sslContextBuilder.loadTrustMaterial((TrustStrategy) (chain, authType) -> true);
-            }
-
-            SSLConnectionSocketFactory connectionSocketFactory = new SSLConnectionSocketFactory(sslContextBuilder.build(),
-                    hostnameVerifier);
-            builder.setSSLSocketFactory(connectionSocketFactory);
-        }
-
-        builder.setMaxConnTotal(maxConnections);
-        builder.setDefaultRequestConfig(RequestConfig.custom().setCookieSpec(CookieSpecs.STANDARD).build());
-
-        return builder.build();
-    }
-
 }

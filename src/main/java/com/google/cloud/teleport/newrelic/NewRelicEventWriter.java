@@ -69,17 +69,13 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     private static final boolean DEFAULT_DISABLE_CERTIFICATE_VALIDATION = false;
     private static final boolean DEFAULT_USE_COMPRESSION = true;
     private static final long DEFAULT_FLUSH_DELAY = 2;
-    private static final Counter INPUT_COUNTER = Metrics
-            .counter(NewRelicEventWriter.class, "inbound-events");
-    private static final Counter SUCCESS_WRITES = Metrics
-            .counter(NewRelicEventWriter.class, "outbound-successful-events");
-    private static final Counter FAILED_WRITES = Metrics
-            .counter(NewRelicEventWriter.class, "outbound-failed-events");
+    private static final Counter INPUT_COUNTER = Metrics.counter(NewRelicEventWriter.class, "inbound-events");
+    private static final Counter SUCCESS_WRITES = Metrics.counter(NewRelicEventWriter.class, "outbound-successful-events");
+    private static final Counter FAILED_WRITES = Metrics.counter(NewRelicEventWriter.class, "outbound-failed-events");
     private static final String BUFFER_STATE_NAME = "buffer";
     private static final String COUNT_STATE_NAME = "count";
     private static final String TIME_ID_NAME = "expiry";
-    private static final Gson GSON =
-            new GsonBuilder().setFieldNamingStrategy(f -> f.getName().toLowerCase()).create();
+    private static final Gson GSON = new GsonBuilder().setFieldNamingStrategy(f -> f.getName().toLowerCase()).create();
 
     @StateId(BUFFER_STATE_NAME)
     private final StateSpec<BagState<NewRelicLogRecord>> buffer = StateSpecs.bag();
@@ -125,15 +121,12 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
         LOG.info("Use Compression set to: {}", useCompression);
 
         try {
-            this.httpClient = new HttpClient();
-            httpClient.setGenericUrl(new GenericUrl(url.get()));
-            httpClient.setApiKey(apiKey.get());
-            httpClient.setDisableCertificateValidation(disableCertificateValidation);
-            httpClient.setUseCompression(useCompression);
-            httpClient.init();
-
+            this.httpClient = HttpClient.init(
+                    new GenericUrl(url.get()),
+                    apiKey.get(),
+                    disableCertificateValidation,
+                    useCompression);
             LOG.info("Successfully created HttpClient");
-
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
             LOG.error("Error creating HttpClient", e);
             throw new RuntimeException(e);
@@ -158,7 +151,6 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
         timer.offset(Duration.standardSeconds(DEFAULT_FLUSH_DELAY)).setRelative();
 
         if (count >= batchCount) {
-
             LOG.debug("Flushing batch of {} events", count);
             flush(receiver, bufferState, countState);
         }
@@ -175,19 +167,6 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
         }
     }
 
-    @Teardown
-    public void tearDown() {
-        if (this.httpClient != null) {
-            try {
-                this.httpClient.close();
-                LOG.debug("Successfully closed HttpClient");
-
-            } catch (IOException e) {
-                LOG.warn("Received exception while closing HttpClient", e);
-            }
-        }
-    }
-
     /**
      * Utility method to flush a batch of requests via {@link HttpClient}.
      *
@@ -199,52 +178,35 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
             @StateId(COUNT_STATE_NAME) ValueState<Long> countState) throws IOException {
 
         if (!bufferState.isEmpty().read()) {
-
+            // Important to close this response to avoid connection leak.
             HttpResponse response = null;
-            List<NewRelicLogRecord> events = ImmutableList.copyOf(bufferState.read());
+            List<NewRelicLogRecord> logRecords = ImmutableList.copyOf(bufferState.read());
             try {
-                // Important to close this response to avoid connection leak.
                 final long startTime = System.currentTimeMillis();
-                response = httpClient.send(events);
+                response = httpClient.send(logRecords);
                 final long duration = System.currentTimeMillis() - startTime;
 
                 if (!response.isSuccessStatusCode()) {
-                    flushWriteFailures(
-                            events, response.getStatusMessage(), response.getStatusCode(), receiver);
+                    LOG.error("Error writing to New Relic. StatusCode: {}, Content: {}, StatusMessage: {}",
+                            response.getStatusCode(), response.getContent(), response.getStatusMessage());
                     logWriteFailures(countState);
-
+                    flushWriteFailures(logRecords, response.getStatusMessage(), response.getStatusCode(), receiver);
                 } else {
-                    StringBuilder textBuilder = new StringBuilder();
-                    try (Reader reader = new BufferedReader(new InputStreamReader
-                            (response.getContent(), Charset.forName(StandardCharsets.UTF_8.name())))) {
-                        int c;
-                        while ((c = reader.read()) != -1) {
-                            textBuilder.append((char) c);
-                        }
-                    }
-
-                    LOG.debug("Successfully wrote {} events in {}ms. Response code {} and body: {}",
-                            countState.read(), duration, response.getStatusCode(), textBuilder);
+                    LOG.debug("Successfully wrote {} log records in {}ms. Response code {} and body: {}",
+                            countState.read(), duration, response.getStatusCode(), response.parseAsString());
                     SUCCESS_WRITES.inc(countState.read());
                 }
-
             } catch (HttpResponseException e) {
-                LOG.error(
-                        "Error writing to New Relic. StatusCode: {}, content: {}, StatusMessage: {}",
-                        e.getStatusCode(), e.getContent(), e.getStatusMessage());
+                LOG.error("Error writing to New Relic", e);
                 logWriteFailures(countState);
-
-                flushWriteFailures(events, e.getStatusMessage(), e.getStatusCode(), receiver);
-
+                flushWriteFailures(logRecords, e.getStatusMessage(), e.getStatusCode(), receiver);
             } catch (IOException ioe) {
-                LOG.error("Error writing to New Relic: {}", ioe.getMessage());
+                LOG.error("Error writing to New Relic", ioe);
                 logWriteFailures(countState);
-
-                flushWriteFailures(events, ioe.getMessage(), null, receiver);
-
+                flushWriteFailures(logRecords, ioe.getMessage(), null, receiver);
             } finally {
                 // States are cleared regardless of write success or failure since we
-                // write failed events to an output PCollection.
+                // write failed logRecords to an output PCollection.
                 bufferState.clear();
                 countState.clear();
 
@@ -256,22 +218,22 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     }
 
     /**
-     * Utility method to un-batch and flush failed write events.
+     * Utility method to un-batch and flush failed write log records.
      *
-     * @param events List of {@link NewRelicLogRecord}s to un-batch
+     * @param logRecords List of {@link NewRelicLogRecord}s to un-batch
      * @param statusMessage Status message to be added to {@link NewRelicLogApiSendError}
      * @param statusCode Status code to be added to {@link NewRelicLogApiSendError}
      * @param receiver Receiver to write {@link NewRelicLogApiSendError}s to
      */
     private static void flushWriteFailures(
-            List<NewRelicLogRecord> events,
+            List<NewRelicLogRecord> logRecords,
             String statusMessage,
             Integer statusCode,
             OutputReceiver<NewRelicLogApiSendError> receiver) {
 
-        checkNotNull(events, "New Relic Events cannot be null.");
+        checkNotNull(logRecords, "New Relic logRecords cannot be null.");
 
-        for (NewRelicLogRecord event : events) {
+        for (NewRelicLogRecord event : logRecords) {
             String payload = GSON.toJson(event);
 
             NewRelicLogApiSendError error = new NewRelicLogApiSendError();
@@ -286,8 +248,20 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     /**
      * Utility method to log write failures and handle metrics.
      */
-    private void logWriteFailures(@StateId(COUNT_STATE_NAME) ValueState<Long> countState) {
-        LOG.error("Failed to write {} events", countState.read());
+    private static void logWriteFailures(@StateId(COUNT_STATE_NAME) ValueState<Long> countState) {
+        LOG.error("Failed to write {} log records", countState.read());
         FAILED_WRITES.inc(countState.read());
+    }
+
+    @Teardown
+    public void tearDown() {
+        if (this.httpClient != null) {
+            try {
+                this.httpClient.close();
+                LOG.debug("Successfully closed HttpClient");
+            } catch (IOException e) {
+                LOG.warn("Received exception while closing HttpClient", e);
+            }
+        }
     }
 }

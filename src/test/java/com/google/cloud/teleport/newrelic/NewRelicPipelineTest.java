@@ -58,7 +58,7 @@ public class NewRelicPipelineTest {
     public void testPubSubMessagesAreSentToNewRelic() {
         mockServerClient
                 .when(HttpRequest.request(EXPECTED_PATH))
-                .respond(HttpResponse.response().withStatusCode(202));
+                .respond(HttpResponse.response().withStatusCode(202).withBody("hey Jo"));
 
         final String message = "A log message";
         final LocalDateTime messageTimestamp = LocalDateTime.of(2021, Month.DECEMBER, 25, 23, 0, 0, 900);
@@ -128,6 +128,11 @@ public class NewRelicPipelineTest {
     // TODO Test that specifying null parameter options correctly use the default values (i.e. specifying null parallelism should result in parallelism=1)
 
     // TODO Test to check batching: sending 3 messages with a batching 2 results in 2 POST requests
+
+    // TODO Test that returning a 429 re-attempts the request. Returning several 429s (more than configured in the backoff)
+    // should result in an error.
+
+    // TODO Test buffer flushing on timer expire
 
     // TODO Test to check compression: check
 
