@@ -111,7 +111,7 @@ public class HttpClient {
      * @param events List of {@link NewRelicLogRecord}s
      * @return {@link HttpResponse} for the POST.
      */
-    public HttpResponse execute(List<NewRelicLogRecord> events) throws IOException {
+    public HttpResponse send(List<NewRelicLogRecord> events) throws IOException {
 
         HttpContent content = getContent(events);
         HttpRequest request = requestFactory.buildPostRequest(genericUrl, content);
@@ -128,13 +128,13 @@ public class HttpClient {
     }
 
     /**
-     * Same as {@link HttpClient#execute(List)} but with a single
+     * Same as {@link HttpClient#send(List)} but with a single
      * {@link NewRelicLogRecord}.
      *
      * @param event {@link NewRelicLogRecord} object.
      */
-    public HttpResponse execute(NewRelicLogRecord event) throws IOException {
-        return this.execute(ImmutableList.of(event));
+    public HttpResponse send(NewRelicLogRecord event) throws IOException {
+        return this.send(ImmutableList.of(event));
     }
 
     /**

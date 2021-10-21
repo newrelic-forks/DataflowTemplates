@@ -90,14 +90,14 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     private Integer batchCount;
     private Boolean disableCertificateValidation;
     private Boolean useCompression;
-    private HttpClient publisher;
+    private HttpClient httpClient;
 
     // Serialized fields
-    private ValueProvider<String> url;
-    private ValueProvider<String> apiKey;
-    private ValueProvider<Boolean> inputDisableCertificateValidation;
-    private ValueProvider<Integer> inputBatchCount;
-    private ValueProvider<Boolean> inputUseCompression;
+    private final ValueProvider<String> url;
+    private final ValueProvider<String> apiKey;
+    private final ValueProvider<Boolean> inputDisableCertificateValidation;
+    private final ValueProvider<Integer> inputBatchCount;
+    private final ValueProvider<Boolean> inputUseCompression;
 
     public NewRelicEventWriter(final NewRelicConfig newRelicConfig) {
         this.url = newRelicConfig.getUrl();
@@ -129,17 +129,17 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
         LOG.info("Use Compression set to: {}", useCompression);
 
         try {
-            this.publisher = new HttpClient();
-            publisher.setGenericUrl(new GenericUrl(url.get()));
-            publisher.setApiKey(apiKey.get());
-            publisher.setDisableCertificateValidation(disableCertificateValidation);
-            publisher.setUseCompression(useCompression);
-            publisher.init();
+            this.httpClient = new HttpClient();
+            httpClient.setGenericUrl(new GenericUrl(url.get()));
+            httpClient.setApiKey(apiKey.get());
+            httpClient.setDisableCertificateValidation(disableCertificateValidation);
+            httpClient.setUseCompression(useCompression);
+            httpClient.init();
 
-            LOG.info("Successfully created HttpEventPublisher");
+            LOG.info("Successfully created HttpClient");
 
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
-            LOG.error("Error creating HttpEventPublisher: {}", e.getMessage());
+            LOG.error("Error creating HttpClient", e);
             throw new RuntimeException(e);
         }
     }
@@ -148,8 +148,8 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
     public void processElement(
             @Element KV<Integer, NewRelicLogRecord> input,
             OutputReceiver<NewRelicLogApiSendError> receiver,
-            @StateId(BUFFER_STATE_NAME) BagState<NewRelicLogRecord> bufferState,
-            @StateId(COUNT_STATE_NAME) ValueState<Long> countState,
+            @AlwaysFetched @StateId(BUFFER_STATE_NAME) BagState<NewRelicLogRecord> bufferState,
+            @AlwaysFetched @StateId(COUNT_STATE_NAME) ValueState<Long> countState,
             @TimerId(TIME_ID_NAME) Timer timer) throws IOException {
 
         Long count = MoreObjects.<Long>firstNonNull(countState.read(), 0L);
@@ -162,7 +162,7 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
 
         if (count >= batchCount) {
 
-            // LOG.info("Flushing batch of {} events", count);
+            LOG.debug("Flushing batch of {} events", count);
             flush(receiver, bufferState, countState);
         }
     }
@@ -173,20 +173,20 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
                          @StateId(COUNT_STATE_NAME) ValueState<Long> countState) throws IOException {
 
         if (MoreObjects.<Long>firstNonNull(countState.read(), 0L) > 0) {
-            // LOG.info("Flushing window with {} events", countState.read());
+            LOG.debug("Flushing window with {} events", countState.read());
             flush(receiver, bufferState, countState);
         }
     }
 
     @Teardown
     public void tearDown() {
-        if (this.publisher != null) {
+        if (this.httpClient != null) {
             try {
-                this.publisher.close();
-                LOG.info("Successfully closed HttpEventPublisher");
+                this.httpClient.close();
+                LOG.debug("Successfully closed HttpClient");
 
             } catch (IOException e) {
-                LOG.warn("Received exception while closing HttpEventPublisher: {}", e.getMessage());
+                LOG.warn("Received exception while closing HttpClient", e);
             }
         }
     }
@@ -207,9 +207,9 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
             List<NewRelicLogRecord> events = Lists.newArrayList(bufferState.read());
             try {
                 // Important to close this response to avoid connection leak.
-                long startTime = System.currentTimeMillis();
-                response = publisher.execute(events);
-                long duration = System.currentTimeMillis() - startTime;
+                final long startTime = System.currentTimeMillis();
+                response = httpClient.send(events);
+                final long duration = System.currentTimeMillis() - startTime;
 
                 if (!response.isSuccessStatusCode()) {
                     flushWriteFailures(
@@ -220,27 +220,27 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
                     StringBuilder textBuilder = new StringBuilder();
                     try (Reader reader = new BufferedReader(new InputStreamReader
                             (response.getContent(), Charset.forName(StandardCharsets.UTF_8.name())))) {
-                        int c = 0;
+                        int c;
                         while ((c = reader.read()) != -1) {
                             textBuilder.append((char) c);
                         }
                     }
 
-                    LOG.info("Successfully wrote {} events in {}ms. Response code {} and body: {}",
-                            countState.read(), duration, response.getStatusCode(), textBuilder.toString());
+                    LOG.debug("Successfully wrote {} events in {}ms. Response code {} and body: {}",
+                            countState.read(), duration, response.getStatusCode(), textBuilder);
                     SUCCESS_WRITES.inc(countState.read());
                 }
 
             } catch (HttpResponseException e) {
                 LOG.error(
-                        "Error writing to NewRelic. StatusCode: {}, content: {}, StatusMessage: {}",
+                        "Error writing to New Relic. StatusCode: {}, content: {}, StatusMessage: {}",
                         e.getStatusCode(), e.getContent(), e.getStatusMessage());
                 logWriteFailures(countState);
 
                 flushWriteFailures(events, e.getStatusMessage(), e.getStatusCode(), receiver);
 
             } catch (IOException ioe) {
-                LOG.error("Error writing to NewRelic: {}", ioe.getMessage());
+                LOG.error("Error writing to New Relic: {}", ioe.getMessage());
                 logWriteFailures(countState);
 
                 flushWriteFailures(events, ioe.getMessage(), null, receiver);
@@ -272,7 +272,7 @@ public class NewRelicEventWriter extends DoFn<KV<Integer, NewRelicLogRecord>, Ne
             Integer statusCode,
             OutputReceiver<NewRelicLogApiSendError> receiver) {
 
-        checkNotNull(events, "NewRelicEvents cannot be null.");
+        checkNotNull(events, "New Relic Events cannot be null.");
 
         for (NewRelicLogRecord event : events) {
             String payload = GSON.toJson(event);
