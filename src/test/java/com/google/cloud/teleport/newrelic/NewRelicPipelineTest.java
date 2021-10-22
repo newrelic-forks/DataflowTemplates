@@ -35,7 +35,7 @@ public class NewRelicPipelineTest {
 
     private static final String EXPECTED_PATH = "/log/v1";
     private static final String API_KEY = "an-api-key";
-    private static final String PLAINTEXT_MESSAGE = "A log message";
+    private static final String PLAINTEXT_MESSAGE = "A PLAINTEXT log message";
     private static final JsonObject EXPECTED_PLAINTEXT_MESSAGE_JSON;
     private static final LocalDateTime SOME_DATETIME = LocalDateTime.of(2021, Month.DECEMBER, 25, 23, 0, 0, 900);
     private static final String JSON_MESSAGE = "{ \"message\": \"A JSON message\", \"timestamp\": \"" + SOME_DATETIME.toString() + "\"}";
@@ -87,9 +87,12 @@ public class NewRelicPipelineTest {
         // When
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
-        final String expectedBody = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON, EXPECTED_JSON_MESSAGE_JSON);
-
         // Then
+        // One single request has been performed
+        mockServerClient.verify(baseRequest(), VerificationTimes.once());
+
+        // Check the body contains the expected messages
+        final String expectedBody = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON, EXPECTED_JSON_MESSAGE_JSON);
         mockServerClient.verify(baseRequest().withBody(JsonBody.json(expectedBody)), VerificationTimes.once());
     }
 
@@ -105,21 +108,36 @@ public class NewRelicPipelineTest {
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
         // Then
-        mockServerClient.verify(
-                baseRequest(),
-                VerificationTimes.exactly(2));
+        mockServerClient.verify(baseRequest(), VerificationTimes.exactly(2));
     }
 
-    private HttpRequest baseRequest() {
-        return HttpRequest.request(EXPECTED_PATH)
-                .withMethod("POST")
-                .withHeader(Header.header("Content-Type", "application/json"))
-                .withHeader(Header.header("api-key", API_KEY));
+    @Test
+    public void testMessagesAreBatchedCorrectly() {
+        // Given
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                Create.of(PLAINTEXT_MESSAGE, PLAINTEXT_MESSAGE, PLAINTEXT_MESSAGE, PLAINTEXT_MESSAGE, PLAINTEXT_MESSAGE),
+                new NewRelicIO(getNewRelicConfig(url, 2, 1, false)));
+
+        // When
+        pipeline.run().waitUntilFinish(Duration.millis(100));
+
+        // Then
+        // Three requests should have been performed: two with 2 messages and one with 1 messages (batching = 2, total messages = 5)
+        mockServerClient.verify(baseRequest(), VerificationTimes.exactly(3));
+
+        // Check the bodies contain the expected messages for each batch
+        final String body1 = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON, EXPECTED_PLAINTEXT_MESSAGE_JSON);
+        final String body2 = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON);
+        mockServerClient.verify(
+                baseRequest().withBody(JsonBody.json(body1)),
+                baseRequest().withBody(JsonBody.json(body1)),
+                baseRequest().withBody(JsonBody.json(body2)));
     }
+
+
 
     // TODO Test that specifying null parameter options correctly use the default values (i.e. specifying null parallelism should result in parallelism=1)
-
-    // TODO Test to check batching: sending 3 messages with a batching 2 results in 2 POST requests
 
     // TODO Test that returning a 429 re-attempts the request. Returning several 429s (more than configured in the backoff)
     // should result in an error.
@@ -144,6 +162,13 @@ public class NewRelicPipelineTest {
         when(newRelicConfig.getUseCompression()).thenReturn(ValueProvider.StaticValueProvider.of(useCompression));
 
         return newRelicConfig;
+    }
+
+    private HttpRequest baseRequest() {
+        return HttpRequest.request(EXPECTED_PATH)
+                .withMethod("POST")
+                .withHeader(Header.header("Content-Type", "application/json"))
+                .withHeader(Header.header("api-key", API_KEY));
     }
 
     private String jsonArrayOf(final JsonObject... jsonObjects) {
