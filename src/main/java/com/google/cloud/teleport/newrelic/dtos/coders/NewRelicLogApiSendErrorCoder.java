@@ -31,7 +31,7 @@ public class NewRelicLogApiSendErrorCoder extends AtomicCoder<NewRelicLogApiSend
 
     @Override
     public void encode(NewRelicLogApiSendError value, OutputStream out) throws IOException {
-        INTEGER_NULLABLE_CODER.encode(value.getStatusCode().orElse(null), out);
+        INTEGER_NULLABLE_CODER.encode(value.getStatusCode(), out);
         STRING_NULLABLE_CODER.encode(value.getStatusMessage(), out);
         STRING_NULLABLE_CODER.encode(value.getPayload(), out);
     }

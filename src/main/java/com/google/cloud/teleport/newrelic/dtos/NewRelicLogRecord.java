@@ -3,24 +3,26 @@ package com.google.cloud.teleport.newrelic.dtos;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 
-import java.util.Optional;
-
 /**
  * A class representing a New Relic Log record.
  */
 public class NewRelicLogRecord {
 
-    /** Message, can either be a plain text string or a string representing a JSON object. Mandatory. */
-    private String message;
-    /** Timestamp of the log record */
-    private Optional<Long> timestamp;
+    /**
+     * Message, can either be a plain text string or a string representing a JSON object. Mandatory.
+     */
+    private final String message;
+    /**
+     * Timestamp of the log record. Optional.
+     */
+    private final Long timestamp;
 
     public NewRelicLogRecord(final String message, final Long timestamp) {
         this.message = message;
-        this.timestamp = Optional.ofNullable(timestamp);
+        this.timestamp = timestamp;
     }
 
-    public Optional<Long> getTimestamp() {
+    public Long getTimestamp() {
         return timestamp;
     }
 

@@ -44,7 +44,7 @@ public class NewRelicLogRecordCoder extends AtomicCoder<NewRelicLogRecord> {
 
     @Override
     public void encode(final NewRelicLogRecord newRelicLogRecord, final OutputStream out) throws IOException {
-        LONG_NULLABLE_CODER.encode(newRelicLogRecord.getTimestamp().orElse(null), out);
+        LONG_NULLABLE_CODER.encode(newRelicLogRecord.getTimestamp(), out);
         STRING_UTF_8_CODER.encode(newRelicLogRecord.getMessage(), out);
     }
 
