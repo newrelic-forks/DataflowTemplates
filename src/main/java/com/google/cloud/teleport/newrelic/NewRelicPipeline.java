@@ -63,7 +63,7 @@ public class NewRelicPipeline {
 
         // Register New relic amd failsafe coders.
         CoderRegistry registry = pipeline.getCoderRegistry();
-        registry.registerCoderForClass(NewRelicLogRecord.class, NewRelicLogRecordCoder.of());
+        registry.registerCoderForClass(NewRelicLogRecord.class, NewRelicLogRecordCoder.getInstance());
         registry.registerCoderForType(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor(), FAILSAFE_ELEMENT_CODER);
 
         // 1) Read messages in from Pub/Sub

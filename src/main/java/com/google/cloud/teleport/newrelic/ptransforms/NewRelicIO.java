@@ -35,6 +35,6 @@ public class NewRelicIO extends PTransform<PCollection<NewRelicLogRecord>, PColl
 
         return input
                 .apply("Distribute execution", DistributeExecution.withParallelism(newRelicConfig.getParallelism()))
-                .apply("Send logs to New Relic", ParDo.of(writer)).setCoder(NewRelicLogApiSendErrorCoder.of());
+                .apply("Send logs to New Relic", ParDo.of(writer)).setCoder(NewRelicLogApiSendErrorCoder.getInstance());
     }
 }

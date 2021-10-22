@@ -34,6 +34,6 @@ public class DistributeExecution extends
 
         return input
                 .apply("Inject Keys", ParDo.of(new InjectKeysFn(this.specifiedParallelism)))
-                .setCoder(KvCoder.of(BigEndianIntegerCoder.of(), NewRelicLogRecordCoder.of()));
+                .setCoder(KvCoder.of(BigEndianIntegerCoder.of(), NewRelicLogRecordCoder.getInstance()));
     }
 }

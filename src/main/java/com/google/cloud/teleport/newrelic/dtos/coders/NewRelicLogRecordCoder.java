@@ -38,30 +38,22 @@ public class NewRelicLogRecordCoder extends AtomicCoder<NewRelicLogRecord> {
     private static final StringUtf8Coder STRING_UTF_8_CODER = StringUtf8Coder.of();
     private static final NullableCoder<Long> LONG_NULLABLE_CODER = NullableCoder.of(BigEndianLongCoder.of());
 
-    public static NewRelicLogRecordCoder of() {
+    public static NewRelicLogRecordCoder getInstance() {
         return SINGLETON;
     }
 
     @Override
     public void encode(final NewRelicLogRecord newRelicLogRecord, final OutputStream out) throws IOException {
-        LONG_NULLABLE_CODER.encode(newRelicLogRecord.getTimestamp(), out);
+        LONG_NULLABLE_CODER.encode(newRelicLogRecord.getTimestamp().orElse(null), out);
         STRING_UTF_8_CODER.encode(newRelicLogRecord.getMessage(), out);
     }
 
     @Override
     public NewRelicLogRecord decode(final InputStream in) throws IOException {
+        final Long timestamp = LONG_NULLABLE_CODER.decode(in);
+        final String message = STRING_UTF_8_CODER.decode(in);
 
-        final NewRelicLogRecord newRelicLogRecord = new NewRelicLogRecord();
-
-        Long time = LONG_NULLABLE_CODER.decode(in);
-        if (time != null) {
-            newRelicLogRecord.setTimestamp(time);
-        }
-
-        String msg = STRING_UTF_8_CODER.decode(in);
-        newRelicLogRecord.setMessage(msg);
-
-        return newRelicLogRecord;
+        return new NewRelicLogRecord(message, timestamp);
     }
 
     @Override

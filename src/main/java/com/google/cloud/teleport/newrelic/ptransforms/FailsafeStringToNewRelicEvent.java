@@ -64,41 +64,10 @@ public class FailsafeStringToNewRelicEvent extends PTransform<PCollection<Failsa
                 final String input = inputElement.getPayload();
 
                 try {
-                    // Start building a NewRelicEvent with the payload as the message.
-                    NewRelicLogRecord nrEvent = new NewRelicLogRecord();
-                    nrEvent.setMessage(input);
+                    final Long timestamp = extractTimestampEpochMillisFromJson(input);
 
-                    // We will attempt to parse the input to see
-                    // if it is a valid JSON and if so, whether we can
-                    // extract some additional properties that would be
-                    // present in Stackdriver's LogEntry structure (timestamp) or
-                    // a user provided _metadata field.
-                    try {
-                        JSONObject json = new JSONObject(input);
-
-                        String parsedTimestamp = json.optString(TIMESTAMP_KEY);
-                        if (!parsedTimestamp.isEmpty()) {
-                            try {
-                                nrEvent.setTimestamp(DateTime.parseRfc3339(parsedTimestamp).getValue());
-                            } catch (NumberFormatException n) {
-                                // We log this exception but don't want to fail the entire record.
-                                LOG.debug("Unable to parse non-rfc3339 formatted timestamp: {}", parsedTimestamp);
-                            }
-                        }
-                    } catch (JSONException je) {
-                        // input is either not a properly formatted JSONObject
-                        // or has other exceptions. In this case, we will
-                        // simply capture the entire input as an 'event' and
-                        // not worry about capturing any specific properties
-                        // (for e.g Timestamp etc).
-                        // We also do not want to LOG this as we might be running
-                        // a pipeline to simply log text entries to NewRelic and
-                        // this is expected behavior.
-                    }
-
-                    outputReceivers.get(successfulConversionsTag).output(nrEvent);
+                    outputReceivers.get(successfulConversionsTag).output(new NewRelicLogRecord(input, timestamp));
                     CONVERSION_SUCCESS.inc();
-
                 } catch (Exception e) {
                     CONVERSION_ERRORS.inc();
                     outputReceivers.get(failedConversionsTag).output(FailsafeElement.of(input, input).setErrorMessage(e.getMessage())
@@ -106,5 +75,35 @@ public class FailsafeStringToNewRelicEvent extends PTransform<PCollection<Failsa
                 }
             }
         }).withOutputTags(successfulConversionsTag, TupleTagList.of(failedConversionsTag)));
+    }
+
+    /**
+     * Utilitary method to extract the "timestamp" field from a potentially JSON-formatted string as epoch milliseconds.
+     * @param input Potentially JSON-formatted string. If the String is not JSON-formatted, this method returns null
+     * @return The epoch milliseconds, if the input is a JSON-formatted string with a "timestamp" field in ISO8601. Otherwise, null.
+     */
+    private static Long extractTimestampEpochMillisFromJson(final String input) {
+        // We attempt to parse the input to see if it is a valid JSON and if so, whether we can extract some
+        // additional properties that would be present in Stackdriver's LogEntry structure (timestamp) or
+        // a user-provided _metadata field.
+        try {
+            final JSONObject json = new JSONObject(input);
+
+            String parsedTimestamp = json.optString(TIMESTAMP_KEY);
+            if (!parsedTimestamp.isEmpty()) {
+                try {
+                     return DateTime.parseRfc3339(parsedTimestamp).getValue();
+                } catch (NumberFormatException n) {
+                    // We log this exception but don't want to fail the entire record.
+                    LOG.debug("Unable to parse non-rfc3339 formatted timestamp: {}", parsedTimestamp);
+                }
+            }
+        } catch (JSONException je) {
+            // input is either not a properly formatted JSONObject or has other exceptions. In this case, we will
+            // simply capture the entire input as a log record and not worry about capturing any specific properties
+            // (for e.g Timestamp etc). We also do not want to LOG this as we might be running a pipeline to
+            // simply log text entries to NewRelic and this is expected behavior.
+        }
+        return null;
     }
 }

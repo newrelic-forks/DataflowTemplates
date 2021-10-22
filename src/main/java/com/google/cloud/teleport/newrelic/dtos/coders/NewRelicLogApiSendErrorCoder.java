@@ -25,27 +25,24 @@ public class NewRelicLogApiSendErrorCoder extends AtomicCoder<NewRelicLogApiSend
     private static final NullableCoder<String> STRING_NULLABLE_CODER = NullableCoder.of(STRING_UTF_8_CODER);
     private static final NullableCoder<Integer> INTEGER_NULLABLE_CODER = NullableCoder.of(BigEndianIntegerCoder.of());
 
-    public static NewRelicLogApiSendErrorCoder of() {
+    public static NewRelicLogApiSendErrorCoder getInstance() {
         return SINGLETON;
     }
 
     @Override
     public void encode(NewRelicLogApiSendError value, OutputStream out) throws IOException {
-        INTEGER_NULLABLE_CODER.encode(value.getStatusCode(), out);
+        INTEGER_NULLABLE_CODER.encode(value.getStatusCode().orElse(null), out);
         STRING_NULLABLE_CODER.encode(value.getStatusMessage(), out);
         STRING_NULLABLE_CODER.encode(value.getPayload(), out);
     }
 
     @Override
     public NewRelicLogApiSendError decode(InputStream in) throws IOException {
+        final Integer statusCode = INTEGER_NULLABLE_CODER.decode(in);
+        final String statusMessage = STRING_NULLABLE_CODER.decode(in);
+        final String payload = STRING_NULLABLE_CODER.decode(in);
 
-        NewRelicLogApiSendError error = new NewRelicLogApiSendError();
-
-        error.setStatusCode(INTEGER_NULLABLE_CODER.decode(in));
-        error.setStatusMessage(STRING_NULLABLE_CODER.decode(in));
-        error.setPayload(STRING_NULLABLE_CODER.decode(in));
-
-        return error;
+        return new NewRelicLogApiSendError(payload, statusMessage, statusCode);
     }
 
     @Override

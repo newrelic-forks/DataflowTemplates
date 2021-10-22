@@ -229,13 +229,7 @@ public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecor
 
         for (NewRelicLogRecord event : logRecords) {
             String payload = GSON.toJson(event);
-
-            NewRelicLogApiSendError error = new NewRelicLogApiSendError();
-            error.setStatusMessage(statusMessage);
-            error.setStatusCode(statusCode);
-            error.setPayload(payload);
-
-            receiver.output(error);
+            receiver.output(new NewRelicLogApiSendError(payload, statusMessage, statusCode));
         }
     }
 
