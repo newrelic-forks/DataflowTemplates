@@ -156,7 +156,7 @@ public class NewRelicLogRecordWriterFn extends DoFn<KV<Integer, NewRelicLogRecor
                          @StateId(COUNT_STATE_NAME) ValueState<Long> countState) throws IOException {
 
         if (MoreObjects.<Long>firstNonNull(countState.read(), 0L) > 0) {
-            LOG.debug("Flushing window with {} events", countState.read());
+            LOG.debug("Timer expired: flushing window with {} events", countState.read());
             flush(receiver, bufferState, countState);
         }
     }

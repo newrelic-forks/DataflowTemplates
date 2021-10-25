@@ -4,10 +4,13 @@ import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
 import com.google.cloud.teleport.newrelic.ptransforms.NewRelicIO;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import org.apache.beam.sdk.coders.StringUtf8Coder;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.testing.TestPipeline;
+import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.transforms.Create;
 import org.joda.time.Duration;
+import org.joda.time.Instant;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -135,20 +138,76 @@ public class NewRelicPipelineTest {
                 baseRequest().withBody(JsonBody.json(body2)));
     }
 
+    @Test
+    public void testMessagesAreNotFlushedIfTimerDoesNotExpire() {
+        // Given
+        final TestStream<String> logRecordLines = TestStream.create(StringUtf8Coder.of())
+                .advanceWatermarkTo(new Instant(0))
+                .addElements(PLAINTEXT_MESSAGE)
+                .advanceWatermarkTo(new Instant(0).plus(Duration.standardSeconds(1)))
+                .addElements(JSON_MESSAGE)
+                .advanceWatermarkToInfinity();
+
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                logRecordLines,
+                new NewRelicIO(getNewRelicConfig(url, 10, 1, false)));
+
+        // When
+        pipeline.run().waitUntilFinish(Duration.millis(100));
+
+        // Then
+        // One single request should have been performed with the 2 messages, as the timer hasn't expired.
+        mockServerClient.verify(baseRequest(), VerificationTimes.once());
+
+        // Check the bodies contain the expected messages for each batch
+        final String body = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON, EXPECTED_JSON_MESSAGE_JSON);
+        mockServerClient.verify(baseRequest().withBody(JsonBody.json(body)),VerificationTimes.once());
+    }
+
+    @Test
+    public void testMessagesAreFlushedIfTimerExpires() {
+        // Given
+        final TestStream<String> logRecordLines = TestStream.create(StringUtf8Coder.of())
+                .advanceWatermarkTo(new Instant(0))
+                .addElements(PLAINTEXT_MESSAGE)
+                .advanceWatermarkTo(new Instant(0).plus(Duration.standardSeconds(3)))
+                .addElements(JSON_MESSAGE)
+                .advanceWatermarkToInfinity();
+
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                logRecordLines,
+                new NewRelicIO(getNewRelicConfig(url, 10, 1, false)));
+
+        // When
+        pipeline.run().waitUntilFinish(Duration.millis(100));
+
+        // Then
+        // One single request should have been performed with the 2 messages, as the timer hasn't expired.
+        mockServerClient.verify(baseRequest(), VerificationTimes.exactly(2));
+
+        // Check the bodies contain the expected messages for each batch
+        final String body1 = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON);
+        final String body2 = jsonArrayOf(EXPECTED_JSON_MESSAGE_JSON);
+        mockServerClient.verify(
+                baseRequest().withBody(JsonBody.json(body1)),
+                baseRequest().withBody(JsonBody.json(body2))
+        );
+    }
+
 
 
     // TODO Test that specifying null parameter options correctly use the default values (i.e. specifying null parallelism should result in parallelism=1)
 
     // TODO Test that returning a 429 re-attempts the request. Returning several 429s (more than configured in the backoff)
     // should result in an error.
-
-    // TODO Test buffer flushing on timer expire
-
+    
     // TODO Test to check compression: check
 
-    // TODO Check max payload size (1MB) allowed by Vortex
+    // TODO Next ticket: Check max payload size (1MB) allowed by Vortex
 
-    // TODO Test to check deadlettering: sending 2 messages with a batching of 1 and creating an expectation in the
+    // TODO Next ticket: Test to check deadlettering: sending 2 messages with a batching of 1 and creating an expectation in the
     // MockServer that rejects the message with a 500 if the message content equals BLA. We ensure that the
     // rejected message ends up in the deadletter queue
 
