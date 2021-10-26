@@ -196,9 +196,22 @@ public class NewRelicPipelineTest {
         );
     }
 
+    @Test
+    public void testPubSubMessagesAreSentToNewRelicWithCompression() {
+        // Given
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                Create.of(JSON_MESSAGE),
+                new NewRelicIO(getNewRelicConfig(url, 1, 1, true)));
+
+        // When
+        pipeline.run().waitUntilFinish(Duration.millis(100));
 
 
-    // TODO Test that specifying null parameter options correctly use the default values (i.e. specifying null parallelism should result in parallelism=1)
+        // Check the body contains the expected messages
+        mockServerClient.verify( baseRequest().withHeader(Header.header("Accept-Encoding", "gzip")), VerificationTimes.once());
+    }
+
 
     // TODO Test that returning a 429 re-attempts the request. Returning several 429s (more than configured in the backoff)
     // should result in an error.

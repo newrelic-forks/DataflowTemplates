@@ -182,6 +182,7 @@ public class HttpClient {
 
         try (final GZIPOutputStream gzipOut = new GZIPOutputStream(bytesOut)) {
             gzipOut.write(uncompressedBytes);
+            gzipOut.close();
             return bytesOut.toByteArray();
         } catch (IOException e) {
             LOG.warn("Couldn't compress byte stream", e);
