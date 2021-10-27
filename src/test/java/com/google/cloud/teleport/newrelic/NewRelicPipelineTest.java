@@ -234,6 +234,52 @@ public class NewRelicPipelineTest {
                 VerificationTimes.once());
     }
 
+    @Test
+    public void testRetriesForRetryableErrors() {
+        // Given
+        String urlRate = String.format("http://localhost:%d%s", mockServerClient.getPort(), EXPECTED_PATH);
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                Create.of(PLAINTEXT_MESSAGE),
+                new NewRelicIO(getNewRelicConfig(urlRate, 10, 1, false)));
+        mockServerClient.reset();
+
+        mockServerClient
+                .when(HttpRequest.request(EXPECTED_PATH), Times.exactly(1))
+                .respond(HttpResponse.response().withStatusCode(429));
+
+        // When
+        pipeline.run().waitUntilFinish(Duration.millis(50));
+
+        // Then
+        // One single request has been performed
+        mockServerClient.verify(HttpRequest.request(EXPECTED_PATH)
+                .withMethod("POST"), VerificationTimes.exactly(2));
+    }
+
+    @Test
+    public void testNoRetryForNonRetryableErrors() {
+        // Given
+        String urlRate = String.format("http://localhost:%d%s", mockServerClient.getPort(), EXPECTED_PATH);
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                Create.of(PLAINTEXT_MESSAGE),
+                new NewRelicIO(getNewRelicConfig(urlRate, 10, 1, false)));
+        mockServerClient.reset();
+
+        mockServerClient
+                .when(HttpRequest.request(EXPECTED_PATH), Times.exactly(1))
+                .respond(HttpResponse.response().withStatusCode(413));
+
+        // When
+        pipeline.run().waitUntilFinish(Duration.millis(50));
+
+        // Then
+        // One single request has been performed
+        mockServerClient.verify(HttpRequest.request(EXPECTED_PATH)
+                .withMethod("POST"), VerificationTimes.exactly(1));
+    }
+
     private NewRelicConfig getNewRelicConfig(final String url, final Integer batchCount, final Integer parallelism, final Boolean useCompression) {
         final NewRelicConfig newRelicConfig = mock(NewRelicConfig.class);
         when(newRelicConfig.getLogsApiUrl()).thenReturn(ValueProvider.StaticValueProvider.of(url));
