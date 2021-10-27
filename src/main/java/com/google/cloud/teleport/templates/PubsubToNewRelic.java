@@ -4,7 +4,7 @@ import com.google.cloud.teleport.coders.FailsafeElementCoder;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.NewRelicPipeline;
 import com.google.cloud.teleport.newrelic.config.NewRelicConfig;
-import com.google.cloud.teleport.newrelic.config.PubSubToNewRelicPipelineOptions;
+import com.google.cloud.teleport.newrelic.config.PubsubToNewRelicPipelineOptions;
 import com.google.cloud.teleport.newrelic.ptransforms.ReadMessagesFromPubSub;
 import com.google.cloud.teleport.newrelic.ptransforms.NewRelicIO;
 import org.apache.beam.sdk.Pipeline;
@@ -15,15 +15,13 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 /**
  * The {@link PubsubToNewRelic} pipeline is a streaming pipeline which ingests data from Cloud
  * Pub/Sub, converts the output to {@link NewRelicLogRecord}s and writes those records
- * into NewRelic's API endpoint. Any log records that experience an error when being converted to
- * {@link NewRelicLogRecord} or when being sent to the New Relic Logs API will be streamed into a deadletter Pub/Sub topic.
+ * into NewRelic's API endpoint.
  *
  * <p><b>Pipeline Requirements</b>
  *
  * <ul>
  *   <li>The source Pub/Sub subscription exists.
  *   <li>API end-point is routable from the VPC where the Dataflow job executes.
- *   <li>Deadletter topic exists.
  * </ul>
  *
  * <p><b>Example Usage</b>
@@ -56,7 +54,6 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
  * REGION=us-west1
  *
  * INPUT_SUB_NAME=SUB NAME WHERE LOGS ARE
- * DEADLETTER_TOPIC_NAME=TOPIC TO FORWARDING UNDELIVERED MESSAGES
  *
  * NR_LOG_ENDPOINT=https://log-api.newrelic.com/log/v1
  *
@@ -65,7 +62,7 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
  *
  * # Execute the templated pipeline:
  * gcloud dataflow jobs run ${JOB_NAME} \
- * --gcs-location=${PIPELINE_FOLDER}/template/PubSubToNewRelic \
+ * --gcs-location=${PIPELINE_FOLDER}/template/PubsubToNewRelic \
  * --region=${REGION} \
  * --parameters \
  * "inputSubscription=projects/${PROJECT_ID}/subscriptions/${INPUT_SUB_NAME},\
@@ -75,7 +72,6 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
  * parallelism=${PARALLELISM},\
  * disableCertificateValidation=false,\
  * useCompression=true"
- * </pre>
  */
 public class PubsubToNewRelic {
 
@@ -88,20 +84,20 @@ public class PubsubToNewRelic {
     /**
      * The main entry-point for pipeline execution. This method will start the pipeline but will not
      * wait for it's execution to finish. If blocking execution is required, use the {@link
-     * PubsubToNewRelic#run(PubSubToNewRelicPipelineOptions)} method to start the pipeline and invoke {@code
+     * PubsubToNewRelic#run(PubsubToNewRelicPipelineOptions)} method to start the pipeline and invoke {@code
      * result.waitUntilFinish()} on the {@link PipelineResult}.
      *
      * @param args The command-line args passed by the executor.
      */
     public static void main(String[] args) {
 
-        final PubSubToNewRelicPipelineOptions options =
-                PipelineOptionsFactory.fromArgs(args).withValidation().as(PubSubToNewRelicPipelineOptions.class);
+        final PubsubToNewRelicPipelineOptions options =
+                PipelineOptionsFactory.fromArgs(args).withValidation().as(PubsubToNewRelicPipelineOptions.class);
 
         run(options);
     }
 
-    public static PipelineResult run(PubSubToNewRelicPipelineOptions options) {
+    public static PipelineResult run(PubsubToNewRelicPipelineOptions options) {
         final Pipeline pipeline = Pipeline.create(options);
 
         final NewRelicPipeline nrPipeline = new NewRelicPipeline(

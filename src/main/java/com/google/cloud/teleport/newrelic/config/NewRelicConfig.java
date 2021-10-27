@@ -6,7 +6,7 @@ import org.apache.beam.sdk.options.ValueProvider;
 /**
  * The NewRelicConfig contains the {@link NewRelicPipelineOptions} that were supplied
  * when starting the Apache Beam job, and which will be used by the {@link com.google.cloud.teleport.newrelic.ptransforms.NewRelicIO}
- * transform to conveniently batch and send the processed logs to New Relic Logs
+ * transform to conveniently batch and send the processed logs to New Relic.
  */
 public class NewRelicConfig {
     private final ValueProvider<String> logsApiUrl;

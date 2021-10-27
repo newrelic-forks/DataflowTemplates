@@ -21,7 +21,7 @@ public class NewRelicIO extends PTransform<PCollection<NewRelicLogRecord>, PColl
 
     private static final Logger LOG = LoggerFactory.getLogger(NewRelicIO.class);
 
-    private NewRelicConfig newRelicConfig;
+    private final NewRelicConfig newRelicConfig;
 
     public NewRelicIO(NewRelicConfig newRelicConfig) {
         this.newRelicConfig = newRelicConfig;
@@ -29,9 +29,8 @@ public class NewRelicIO extends PTransform<PCollection<NewRelicLogRecord>, PColl
 
     @Override
     public PCollection<NewRelicLogApiSendError> expand(PCollection<NewRelicLogRecord> input) {
-        LOG.info("Configuring NewRelicEventWriter.");
+        LOG.debug("Configuring NewRelicRecordWriter.");
         NewRelicLogRecordWriterFn writer = new NewRelicLogRecordWriterFn(newRelicConfig);
-        LOG.info("NewRelicEventWriter configured");
 
         return input
                 .apply("Distribute execution", DistributeExecution.withParallelism(newRelicConfig.getParallelism()))

@@ -4,7 +4,7 @@ import com.google.cloud.teleport.coders.FailsafeElementCoder;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogApiSendError;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
 import com.google.cloud.teleport.newrelic.dtos.coders.NewRelicLogRecordCoder;
-import com.google.cloud.teleport.newrelic.ptransforms.FailsafeStringToNewRelicEvent;
+import com.google.cloud.teleport.newrelic.ptransforms.FailsafeStringToNewRelicRecords;
 import com.google.cloud.teleport.values.FailsafeElement;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.PipelineResult;
@@ -56,12 +56,11 @@ public class NewRelicPipeline {
      * object to block until the pipeline is finished running if blocking programmatic execution is
      * required.
      *
-     * @param options: the execution options.
      * @return The pipeline result.
      */
     public PipelineResult run() {
 
-        // Register New relic amd failsafe coders.
+        // Register New relic and failsafe coders.
         CoderRegistry registry = pipeline.getCoderRegistry();
         registry.registerCoderForClass(NewRelicLogRecord.class, NewRelicLogRecordCoder.getInstance());
         registry.registerCoderForType(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor(), FAILSAFE_ELEMENT_CODER);
@@ -76,11 +75,11 @@ public class NewRelicPipeline {
                         MapElements.into(FAILSAFE_ELEMENT_CODER.getEncodedTypeDescriptor())
                                 .via(input -> FailsafeElement.of(input, input)));
 
-        // 3) Convert successfully transformed messages into NewRelicEvent objects
+        // 3) Convert successfully transformed messages into NewRelicRecords objects
         PCollectionTuple convertToEventTuple = transformedOutput
-                .apply("Transform to NewRelicLogRecord", FailsafeStringToNewRelicEvent.withOutputTags(SUCCESSFUL_CONVERSIONS, FAILED_CONVERSIONS));
+                .apply("Transform to NewRelicLogRecord", FailsafeStringToNewRelicRecords.withOutputTags(SUCCESSFUL_CONVERSIONS, FAILED_CONVERSIONS));
 
-        // 4) Write NewRelicEvents to NewRelic's Log API end point.
+        // 4) Write NewRelicRecords to NewRelic's Log API end point.
         convertToEventTuple
                 .get(SUCCESSFUL_CONVERSIONS)
                 .apply("Forward logs to New Relic", newrelicMessageWriterTransform);

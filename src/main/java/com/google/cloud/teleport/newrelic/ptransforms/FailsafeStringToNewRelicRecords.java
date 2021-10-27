@@ -21,24 +21,24 @@ import org.slf4j.LoggerFactory;
 /**
  * Transforms messages (either as plain strings or as JSON strings) to {@link NewRelicLogRecord}s
  */
-public class FailsafeStringToNewRelicEvent extends PTransform<PCollection<FailsafeElement<String, String>>, PCollectionTuple> {
+public class FailsafeStringToNewRelicRecords extends PTransform<PCollection<FailsafeElement<String, String>>, PCollectionTuple> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(FailsafeStringToNewRelicEvent.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FailsafeStringToNewRelicRecords.class);
     private static final String TIMESTAMP_KEY = "timestamp";
-    private static final Counter CONVERSION_ERRORS = Metrics.counter(FailsafeStringToNewRelicEvent.class, "newrelic-event-conversion-errors");
-    private static final Counter CONVERSION_SUCCESS = Metrics.counter(FailsafeStringToNewRelicEvent.class, "newrelic-event-conversion-successes");
+    private static final Counter CONVERSION_ERRORS = Metrics.counter(FailsafeStringToNewRelicRecords.class, "newrelic-event-conversion-errors");
+    private static final Counter CONVERSION_SUCCESS = Metrics.counter(FailsafeStringToNewRelicRecords.class, "newrelic-event-conversion-successes");
 
     private TupleTag<NewRelicLogRecord> successfulConversionsTag;
     private TupleTag<FailsafeElement<String, String>> failedConversionsTag;
 
-    private FailsafeStringToNewRelicEvent(TupleTag<NewRelicLogRecord> successfulConversionsTag,
-                                          TupleTag<FailsafeElement<String, String>> failedConversionsTag) {
+    private FailsafeStringToNewRelicRecords(TupleTag<NewRelicLogRecord> successfulConversionsTag,
+                                            TupleTag<FailsafeElement<String, String>> failedConversionsTag) {
         this.successfulConversionsTag = successfulConversionsTag;
         this.failedConversionsTag = failedConversionsTag;
     }
 
     /**
-     * Returns a {@link FailsafeStringToNewRelicEvent} {@link PTransform} that
+     * Returns a {@link FailsafeStringToNewRelicRecords} {@link PTransform} that
      * consumes {@link FailsafeElement} messages and creates {@link NewRelicLogRecord}
      * objects. Any conversion errors are wrapped into a {@link FailsafeElement}
      * with appropriate error information.
@@ -46,9 +46,9 @@ public class FailsafeStringToNewRelicEvent extends PTransform<PCollection<Failsa
      * @param successfulConversionsTag {@link TupleTag} to use for successfully converted messages.
      * @param failedConversionsTag     {@link TupleTag} to use for messages that failed conversion.
      */
-    public static FailsafeStringToNewRelicEvent withOutputTags(TupleTag<NewRelicLogRecord> successfulConversionsTag,
-                                                               TupleTag<FailsafeElement<String, String>> failedConversionsTag) {
-        return new FailsafeStringToNewRelicEvent(successfulConversionsTag, failedConversionsTag);
+    public static FailsafeStringToNewRelicRecords withOutputTags(TupleTag<NewRelicLogRecord> successfulConversionsTag,
+                                                                 TupleTag<FailsafeElement<String, String>> failedConversionsTag) {
+        return new FailsafeStringToNewRelicRecords(successfulConversionsTag, failedConversionsTag);
     }
 
     @Override
