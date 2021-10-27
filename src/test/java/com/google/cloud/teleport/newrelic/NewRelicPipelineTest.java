@@ -198,25 +198,6 @@ public class NewRelicPipelineTest {
     }
 
     @Test
-    public void testPubSubMessagesAreSentToNewRelicWithOutCompression() {
-        // Given
-        NewRelicPipeline pipeline = new NewRelicPipeline(
-                testPipeline,
-                Create.of(JSON_MESSAGE),
-                new NewRelicIO(getNewRelicConfig(url, 1, 1, false)));
-
-        // When
-        pipeline.run().waitUntilFinish(Duration.millis(100));
-
-        // Check the body contains the expected messages
-        mockServerClient.verify(
-                baseRequest()
-                        .withHeader("content-length", "126")
-                        .withHeader("content-type", "application/json"),
-                VerificationTimes.once());
-    }
-
-    @Test
     public void testPubSubMessagesAreSentToNewRelicWithCompression() {
         // Given
         NewRelicPipeline pipeline = new NewRelicPipeline(
@@ -229,7 +210,6 @@ public class NewRelicPipelineTest {
 
         // Check the body contains the expected messages
         mockServerClient.verify(baseRequest()
-                        .withHeader("content-length", "109")
                         .withHeader("content-type", "application/gzip"),
                 VerificationTimes.once());
     }
@@ -295,7 +275,6 @@ public class NewRelicPipelineTest {
     private HttpRequest baseRequest() {
         return HttpRequest.request(EXPECTED_PATH)
                 .withMethod("POST")
-                .withHeader(Header.header("Content-Type", "application/json"))
                 .withHeader(Header.header("api-key", API_KEY));
     }
 

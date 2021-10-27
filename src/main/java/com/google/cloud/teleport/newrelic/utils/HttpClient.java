@@ -12,7 +12,6 @@ import com.google.api.client.http.apache.v2.ApacheHttpTransport;
 import com.google.api.client.util.ExponentialBackOff;
 import com.google.api.client.util.StringUtils;
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
-import com.google.common.base.MoreObjects;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -30,14 +29,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.HostnameVerifier;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Set;
-import java.util.zip.GZIPOutputStream;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -155,14 +152,15 @@ public class HttpClient {
      */
     public HttpResponse send(final List<NewRelicLogRecord> logRecords) throws IOException {
         final byte[] bodyBytes = StringUtils.getBytesUtf8(toJsonString(logRecords));
-        final byte[] compressedBodyBytes = useCompression ? compress(bodyBytes) : null;
         final String contentType = useCompression ? "application/gzip" : "application/json";
-        final HttpContent content = new ByteArrayContent(contentType, MoreObjects.firstNonNull(compressedBodyBytes, bodyBytes));
+        final HttpContent content = new ByteArrayContent(contentType, bodyBytes);
 
         final HttpRequest request = requestFactory.buildPostRequest(logsApiUrl, content);
         request.setUnsuccessfulResponseHandler(RESPONSE_HANDLER);
-        setHeaders(request, compressedBodyBytes != null);
-
+        request.getHeaders().set("Api-Key", licenseKey);
+        if(useCompression) {
+            request.setEncoding(GZIP_ENCODING);
+        }
         return request.execute();
     }
 
@@ -172,37 +170,6 @@ public class HttpClient {
     private String toJsonString(List<NewRelicLogRecord> logRecords) {
         return GSON.toJsonTree(logRecords, new TypeToken<List<NewRelicLogRecord>>() {
         }.getType()).toString();
-    }
-
-    /**
-     * Utility method to compress a byte array in GZIP
-     * @param uncompressedBytes Uncompressed byte array
-     * @return GZIP-compressed byte array
-     */
-    private static byte[] compress(final byte[] uncompressedBytes) {
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-
-        try (final GZIPOutputStream gzipOut = new GZIPOutputStream(bytesOut)) {
-            gzipOut.write(uncompressedBytes);
-            gzipOut.close();
-            return bytesOut.toByteArray();
-        } catch (IOException e) {
-            LOG.warn("Couldn't compress byte stream", e);
-            return null;
-        }
-    }
-
-    /**
-     * Utility method to set authorization and compression HTTP headers into the {@link HttpRequest}.
-     *
-     * @param request {@link HttpRequest} object to add headers to.
-     */
-    private void setHeaders(final HttpRequest request, final boolean includeGzipHeader) {
-        request.getHeaders().set("Api-Key", licenseKey);
-        if (includeGzipHeader) {
-            request.setEncoding(GZIP_ENCODING);
-            request.getHeaders().set("Content-Encoding", "gzip");
-        }
     }
 
     /**
