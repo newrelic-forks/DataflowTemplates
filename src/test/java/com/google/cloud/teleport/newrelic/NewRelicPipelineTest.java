@@ -16,6 +16,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockserver.client.MockServerClient;
+import org.mockserver.matchers.Times;
 import org.mockserver.model.Header;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
@@ -197,6 +198,25 @@ public class NewRelicPipelineTest {
     }
 
     @Test
+    public void testPubSubMessagesAreSentToNewRelicWithOutCompression() {
+        // Given
+        NewRelicPipeline pipeline = new NewRelicPipeline(
+                testPipeline,
+                Create.of(JSON_MESSAGE),
+                new NewRelicIO(getNewRelicConfig(url, 1, 1, false)));
+
+        // When
+        pipeline.run().waitUntilFinish(Duration.millis(100));
+
+        // Check the body contains the expected messages
+        mockServerClient.verify(
+                baseRequest()
+                        .withHeader("content-length", "126")
+                        .withHeader("content-type", "application/json"),
+                VerificationTimes.once());
+    }
+
+    @Test
     public void testPubSubMessagesAreSentToNewRelicWithCompression() {
         // Given
         NewRelicPipeline pipeline = new NewRelicPipeline(
@@ -207,22 +227,12 @@ public class NewRelicPipelineTest {
         // When
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
-
         // Check the body contains the expected messages
-        mockServerClient.verify( baseRequest().withHeader(Header.header("Accept-Encoding", "gzip")), VerificationTimes.once());
+        mockServerClient.verify(baseRequest()
+                        .withHeader("content-length", "109")
+                        .withHeader("content-type", "application/gzip"),
+                VerificationTimes.once());
     }
-
-
-    // TODO Test that returning a 429 re-attempts the request. Returning several 429s (more than configured in the backoff)
-    // should result in an error.
-    
-    // TODO Test to check compression: check
-
-    // TODO Next ticket: Check max payload size (1MB) allowed by Vortex
-
-    // TODO Next ticket: Test to check deadlettering: sending 2 messages with a batching of 1 and creating an expectation in the
-    // MockServer that rejects the message with a 500 if the message content equals BLA. We ensure that the
-    // rejected message ends up in the deadletter queue
 
     private NewRelicConfig getNewRelicConfig(final String url, final Integer batchCount, final Integer parallelism, final Boolean useCompression) {
         final NewRelicConfig newRelicConfig = mock(NewRelicConfig.class);

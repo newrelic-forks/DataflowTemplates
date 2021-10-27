@@ -1,6 +1,7 @@
 package com.google.cloud.teleport.newrelic.utils;
 
 import com.google.api.client.http.ByteArrayContent;
+import com.google.api.client.http.GZipEncoding;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpBackOffUnsuccessfulResponseHandler;
 import com.google.api.client.http.HttpContent;
@@ -54,6 +55,7 @@ public class HttpClient {
     // If a POST request fails, the following response handler will determine whether the request should be reattempted
     // and will sleep for some time before retrying, by following an exponential backoff mechanism.
     private static final HttpBackOffUnsuccessfulResponseHandler RESPONSE_HANDLER;
+    public static final GZipEncoding GZIP_ENCODING = new GZipEncoding();
 
     static {
         RESPONSE_HANDLER = new HttpBackOffUnsuccessfulResponseHandler(
@@ -154,8 +156,8 @@ public class HttpClient {
     public HttpResponse send(final List<NewRelicLogRecord> logRecords) throws IOException {
         final byte[] bodyBytes = StringUtils.getBytesUtf8(toJsonString(logRecords));
         final byte[] compressedBodyBytes = useCompression ? compress(bodyBytes) : null;
-
-        final HttpContent content = new ByteArrayContent("application/json", MoreObjects.firstNonNull(compressedBodyBytes, bodyBytes));
+        final String contentType = useCompression ? "application/gzip" : "application/json";
+        final HttpContent content = new ByteArrayContent(contentType, MoreObjects.firstNonNull(compressedBodyBytes, bodyBytes));
 
         final HttpRequest request = requestFactory.buildPostRequest(logsApiUrl, content);
         request.setUnsuccessfulResponseHandler(RESPONSE_HANDLER);
@@ -198,6 +200,7 @@ public class HttpClient {
     private void setHeaders(final HttpRequest request, final boolean includeGzipHeader) {
         request.getHeaders().set("Api-Key", licenseKey);
         if (includeGzipHeader) {
+            request.setEncoding(GZIP_ENCODING);
             request.getHeaders().set("Content-Encoding", "gzip");
         }
     }
