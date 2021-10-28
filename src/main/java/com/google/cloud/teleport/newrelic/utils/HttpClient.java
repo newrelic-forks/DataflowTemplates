@@ -53,6 +53,9 @@ public class HttpClient {
     // and will sleep for some time before retrying, by following an exponential backoff mechanism.
     private static final HttpBackOffUnsuccessfulResponseHandler RESPONSE_HANDLER;
     public static final GZipEncoding GZIP_ENCODING = new GZipEncoding();
+    public static final String APPLICATION_GZIP = "application/gzip";
+    public static final String APPLICATION_JSON = "application/json";
+    public static final String API_KEY = "Api-Key";
 
     static {
         RESPONSE_HANDLER = new HttpBackOffUnsuccessfulResponseHandler(
@@ -152,12 +155,12 @@ public class HttpClient {
      */
     public HttpResponse send(final List<NewRelicLogRecord> logRecords) throws IOException {
         final byte[] bodyBytes = StringUtils.getBytesUtf8(toJsonString(logRecords));
-        final String contentType = useCompression ? "application/gzip" : "application/json";
+        final String contentType = useCompression ? APPLICATION_GZIP : APPLICATION_JSON;
         final HttpContent content = new ByteArrayContent(contentType, bodyBytes);
 
         final HttpRequest request = requestFactory.buildPostRequest(logsApiUrl, content);
         request.setUnsuccessfulResponseHandler(RESPONSE_HANDLER);
-        request.getHeaders().set("Api-Key", licenseKey);
+        request.getHeaders().set(API_KEY, licenseKey);
         if(useCompression) {
             request.setEncoding(GZIP_ENCODING);
         }

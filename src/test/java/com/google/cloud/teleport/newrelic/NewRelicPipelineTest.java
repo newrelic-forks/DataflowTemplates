@@ -27,6 +27,8 @@ import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.ZoneOffset;
 
+import static com.google.cloud.teleport.newrelic.utils.HttpClient.APPLICATION_GZIP;
+import static com.google.cloud.teleport.newrelic.utils.HttpClient.APPLICATION_JSON;
 import static org.junit.Assume.assumeNoException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -93,11 +95,13 @@ public class NewRelicPipelineTest {
 
         // Then
         // One single request has been performed
-        mockServerClient.verify(baseRequest(), VerificationTimes.once());
+        mockServerClient.verify(baseJsonRequest(), VerificationTimes.once());
 
         // Check the body contains the expected messages
         final String expectedBody = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON, EXPECTED_JSON_MESSAGE_JSON);
-        mockServerClient.verify(baseRequest().withBody(JsonBody.json(expectedBody)), VerificationTimes.once());
+        mockServerClient.verify(baseJsonRequest()
+                .withBody(JsonBody.json(expectedBody)),
+                VerificationTimes.once());
     }
 
     @Test
@@ -112,7 +116,7 @@ public class NewRelicPipelineTest {
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
         // Then
-        mockServerClient.verify(baseRequest(), VerificationTimes.exactly(2));
+        mockServerClient.verify(baseJsonRequest(), VerificationTimes.exactly(2));
     }
 
     @Test
@@ -128,15 +132,15 @@ public class NewRelicPipelineTest {
 
         // Then
         // Three requests should have been performed: two with 2 messages and one with 1 messages (batching = 2, total messages = 5)
-        mockServerClient.verify(baseRequest(), VerificationTimes.exactly(3));
+        mockServerClient.verify(baseJsonRequest(), VerificationTimes.exactly(3));
 
         // Check the bodies contain the expected messages for each batch
         final String body1 = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON, EXPECTED_PLAINTEXT_MESSAGE_JSON);
         final String body2 = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON);
         mockServerClient.verify(
-                baseRequest().withBody(JsonBody.json(body1)),
-                baseRequest().withBody(JsonBody.json(body1)),
-                baseRequest().withBody(JsonBody.json(body2)));
+                baseJsonRequest().withBody(JsonBody.json(body1)),
+                baseJsonRequest().withBody(JsonBody.json(body1)),
+                baseJsonRequest().withBody(JsonBody.json(body2)));
     }
 
     @Test
@@ -159,11 +163,11 @@ public class NewRelicPipelineTest {
 
         // Then
         // One single request should have been performed with the 2 messages, as the timer hasn't expired.
-        mockServerClient.verify(baseRequest(), VerificationTimes.once());
+        mockServerClient.verify(baseJsonRequest(), VerificationTimes.once());
 
         // Check the bodies contain the expected messages for each batch
         final String body = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON, EXPECTED_JSON_MESSAGE_JSON);
-        mockServerClient.verify(baseRequest().withBody(JsonBody.json(body)),VerificationTimes.once());
+        mockServerClient.verify(baseJsonRequest().withBody(JsonBody.json(body)),VerificationTimes.once());
     }
 
     @Test
@@ -186,14 +190,14 @@ public class NewRelicPipelineTest {
 
         // Then
         // One single request should have been performed with the 2 messages, as the timer hasn't expired.
-        mockServerClient.verify(baseRequest(), VerificationTimes.exactly(2));
+        mockServerClient.verify(baseJsonRequest(), VerificationTimes.exactly(2));
 
         // Check the bodies contain the expected messages for each batch
         final String body1 = jsonArrayOf(EXPECTED_PLAINTEXT_MESSAGE_JSON);
         final String body2 = jsonArrayOf(EXPECTED_JSON_MESSAGE_JSON);
         mockServerClient.verify(
-                baseRequest().withBody(JsonBody.json(body1)),
-                baseRequest().withBody(JsonBody.json(body2))
+                baseJsonRequest().withBody(JsonBody.json(body1)),
+                baseJsonRequest().withBody(JsonBody.json(body2))
         );
     }
 
@@ -209,9 +213,7 @@ public class NewRelicPipelineTest {
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
         // Check the body contains the expected messages
-        mockServerClient.verify(baseRequest()
-                        .withHeader("content-type", "application/gzip"),
-                VerificationTimes.once());
+        mockServerClient.verify(baseGzipRequest(), VerificationTimes.once());
     }
 
     @Test
@@ -232,9 +234,8 @@ public class NewRelicPipelineTest {
         pipeline.run().waitUntilFinish(Duration.millis(50));
 
         // Then
-        // One single request has been performed
-        mockServerClient.verify(HttpRequest.request(EXPECTED_PATH)
-                .withMethod("POST"), VerificationTimes.exactly(2));
+        // Two identical requests were performed, as the Http Client retries sending the original payload after receiving the first 429
+        mockServerClient.verify(baseJsonRequest(), VerificationTimes.exactly(2));
     }
 
     @Test
@@ -256,8 +257,7 @@ public class NewRelicPipelineTest {
 
         // Then
         // One single request has been performed
-        mockServerClient.verify(HttpRequest.request(EXPECTED_PATH)
-                .withMethod("POST"), VerificationTimes.exactly(1));
+        mockServerClient.verify(baseJsonRequest(), VerificationTimes.exactly(1));
     }
 
     private NewRelicConfig getNewRelicConfig(final String url, final Integer batchCount, final Integer parallelism, final Boolean useCompression) {
@@ -272,9 +272,17 @@ public class NewRelicPipelineTest {
         return newRelicConfig;
     }
 
-    private HttpRequest baseRequest() {
+    private HttpRequest baseJsonRequest() {
         return HttpRequest.request(EXPECTED_PATH)
                 .withMethod("POST")
+                .withHeader(Header.header("Content-Type", APPLICATION_JSON))
+                .withHeader(Header.header("api-key", API_KEY));
+    }
+
+    private HttpRequest baseGzipRequest() {
+        return HttpRequest.request(EXPECTED_PATH)
+                .withMethod("POST")
+                .withHeader(Header.header("Content-Type", APPLICATION_GZIP))
                 .withHeader(Header.header("api-key", API_KEY));
     }
 

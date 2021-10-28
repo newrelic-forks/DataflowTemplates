@@ -1,7 +1,6 @@
 package com.google.cloud.teleport.newrelic.dofns;
 
 import com.google.cloud.teleport.newrelic.dtos.NewRelicLogRecord;
-import com.google.cloud.teleport.newrelic.ptransforms.DistributeExecution;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.values.KV;
