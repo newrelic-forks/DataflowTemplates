@@ -212,7 +212,7 @@ public class NewRelicPipelineTest {
         // When
         pipeline.run().waitUntilFinish(Duration.millis(100));
 
-        // Check the body contains the expected messages
+        // Then
         mockServerClient.verify(baseGzipRequest(), VerificationTimes.once());
     }
 
