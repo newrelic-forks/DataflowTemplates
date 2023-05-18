@@ -22,8 +22,11 @@ import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.transforms.windowing.FixedWindows;
+import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.PBegin;
 import org.apache.beam.sdk.values.PCollection;
+import org.joda.time.Duration;
 
 /**
  * This PTransform reads messages from a PubSub subscription and returns a PCollection of Strings,
@@ -43,6 +46,7 @@ public class ReadMessagesFromPubSub extends PTransform<PBegin, PCollection<Strin
         .apply(
             "ReadPubsubMessage",
             PubsubIO.readMessagesWithAttributes().fromSubscription(subscriptionName))
+        .apply(Window.into(FixedWindows.of(Duration.standardSeconds(5))))
         .apply(
             "ExtractDataAsString",
             ParDo.of(
