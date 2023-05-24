@@ -16,14 +16,19 @@
 package com.google.cloud.teleport.newrelic.ptransforms;
 
 import java.nio.charset.StandardCharsets;
+
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubMessage;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.transforms.windowing.AfterProcessingTime;
+import org.apache.beam.sdk.transforms.windowing.FixedWindows;
+import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.PBegin;
 import org.apache.beam.sdk.values.PCollection;
+import org.joda.time.Duration;
 
 /**
  * This PTransform reads messages from a PubSub subscription and returns a PCollection of Strings,
@@ -43,6 +48,13 @@ public class ReadMessagesFromPubSub extends PTransform<PBegin, PCollection<Strin
         .apply(
             "ReadPubsubMessage",
             PubsubIO.readMessagesWithAttributes().fromSubscription(subscriptionName))
+        .apply(Window.<PubsubMessage>configure()
+          .triggering(
+            AfterProcessingTime
+              .pastFirstElementInPane()
+              .plusDelayOf(Duration.standardSeconds(1)))
+          .withAllowedLateness(Duration.standardDays(2))
+          .discardingFiredPanes())
         .apply(
             "ExtractDataAsString",
             ParDo.of(

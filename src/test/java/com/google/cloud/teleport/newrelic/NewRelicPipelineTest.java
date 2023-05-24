@@ -130,16 +130,22 @@ public class NewRelicPipelineTest {
   @Test
   public void testMessagesAreBatchedCorrectly() {
     // Given
+    final int flushDelay = 2;
+    final TestStream<String> logRecordLines =
+      TestStream.create(StringUtf8Coder.of())
+        .addElements(PLAINTEXT_MESSAGE,
+          PLAINTEXT_MESSAGE,
+          PLAINTEXT_MESSAGE,
+          PLAINTEXT_MESSAGE,
+          PLAINTEXT_MESSAGE)
+        .advanceProcessingTime(Duration.standardSeconds(2 * flushDelay))
+        .advanceWatermarkToInfinity();
+
     NewRelicPipeline pipeline =
       new NewRelicPipeline(
         testPipeline,
-        Create.of(
-          PLAINTEXT_MESSAGE,
-          PLAINTEXT_MESSAGE,
-          PLAINTEXT_MESSAGE,
-          PLAINTEXT_MESSAGE,
-          PLAINTEXT_MESSAGE),
-        new NewRelicIO(getPipelineOptions(url, 2, 2, 1, false)));
+        logRecordLines,
+        new NewRelicIO(getPipelineOptions(url, 2, flushDelay, 1, false)));
 
     // When
     pipeline.run().waitUntilFinish(Duration.millis(100));
@@ -165,10 +171,10 @@ public class NewRelicPipelineTest {
     final int flushDelay = 2;
     final TestStream<String> logRecordLines =
       TestStream.create(StringUtf8Coder.of())
-        .advanceWatermarkTo(new Instant(0))
         .addElements(PLAINTEXT_MESSAGE)
-        .advanceWatermarkTo(new Instant(0).plus(Duration.standardSeconds(flushDelay - 1)))
+        .advanceProcessingTime(Duration.standardSeconds(flushDelay - 1))
         .addElements(JSON_MESSAGE)
+        .advanceProcessingTime(Duration.standardSeconds(2*flushDelay))
         .advanceWatermarkToInfinity();
 
     NewRelicPipeline pipeline =
@@ -197,10 +203,10 @@ public class NewRelicPipelineTest {
     final int flushDelay = 2;
     final TestStream<String> logRecordLines =
       TestStream.create(StringUtf8Coder.of())
-        .advanceWatermarkTo(new Instant(0))
         .addElements(PLAINTEXT_MESSAGE)
-        .advanceWatermarkTo(new Instant(0).plus(Duration.standardSeconds(flushDelay + 1)))
+        .advanceProcessingTime(Duration.standardSeconds(flushDelay + 1))
         .addElements(JSON_MESSAGE)
+        .advanceProcessingTime(Duration.standardSeconds(2 * flushDelay))
         .advanceWatermarkToInfinity();
 
     NewRelicPipeline pipeline =

@@ -79,7 +79,7 @@ public class NewRelicLogRecordWriterFn
   private final StateSpec<ValueState<Long>> count = StateSpecs.value();
 
   @TimerId(TIME_ID_NAME)
-  private final TimerSpec expirySpec = TimerSpecs.timer(TimeDomain.EVENT_TIME);
+  private final TimerSpec expirySpec = TimerSpecs.timer(TimeDomain.PROCESSING_TIME);
 
   // Non-serialized fields: these are set up once the DoFn has potentially been deserialized, in the
   // @Setup method.
