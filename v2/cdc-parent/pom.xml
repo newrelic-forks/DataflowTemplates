@@ -35,7 +35,7 @@
     <grpc.version>1.35.0</grpc.version>
     <guava.version>25.1-jre</guava.version>
     <gcp.version>1.82.0</gcp.version>
-    <data-catalog.version>0.35.0</data-catalog.version>
+    <data-catalog.version>1.26.0</data-catalog.version>
   </properties>
   <licenses>
     <license>
