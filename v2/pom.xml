@@ -52,7 +52,7 @@
         <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
         <slf4j.version>1.7.25</slf4j.version>
         <mvn-target-dir>${basedir}/target</mvn-target-dir>
-        <json.version>20200518</json.version>
+        <json.version>20231013</json.version>
         <excluded.spanner.tests>com.google.cloud.teleport.v2.spanner.IntegrationTest</excluded.spanner.tests>
         <spotless-maven-plugin.version>2.12.1</spotless-maven-plugin.version>
     </properties>
@@ -272,8 +272,7 @@
                                     </filter>
                                 </filters>
                                 <transformers>
-                                    <transformer
-                                            implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                    <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 </transformers>
                             </configuration>
                         </execution>
@@ -411,8 +410,7 @@
                                 </filter>
                             </filters>
                             <transformers>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                         </configuration>
                     </execution>
@@ -578,7 +576,7 @@
                   </format>
                 </formats>
                 <java>
-                  <toggleOffOn />
+                  <toggleOffOn/>
                   <googleJavaFormat>
                     <version>1.8</version>
                     <style>GOOGLE</style>
