@@ -60,7 +60,7 @@
     <bigtable.version>1.15.0</bigtable.version>
     <bigtable-beam-import.version>1.15.0</bigtable-beam-import.version>
     <protobuf.version>3.11.1</protobuf.version>
-    <json.version>20200518</json.version>
+    <json.version>20231013</json.version>
     <junit.jupiter.version>5.5.2</junit.jupiter.version>
     <re2j.version>1.4</re2j.version>
     <codehaus-jackson.version>1.9.13</codehaus-jackson.version>
@@ -509,8 +509,7 @@
                   </filter>
                 </filters>
                 <transformers>
-                  <transformer
-                      implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 </transformers>
               </configuration>
             </execution>
@@ -881,7 +880,7 @@
             </format>
           </formats>
           <java>
-            <toggleOffOn />
+            <toggleOffOn/>
             <googleJavaFormat>
               <version>1.8</version>
               <style>GOOGLE</style>
