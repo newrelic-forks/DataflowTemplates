@@ -17,6 +17,8 @@ package com.google.cloud.teleport.newrelic.config;
 
 import com.google.cloud.teleport.util.KMSEncryptedNestedValueProvider;
 import org.apache.beam.sdk.options.ValueProvider;
+import org.apache.beam.sdk.options.ValueProvider.NestedValueProvider;
+import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.commons.lang.builder.ToStringBuilder;
 
 /**
@@ -148,8 +150,14 @@ public class NewRelicConfig {
    *     otherwise the default value.
    */
   private static <T> ValueProvider<T> valueOrDefault(ValueProvider<T> value, T defaultValue) {
-    return (value != null && value.isAccessible()) && value.get() != null
-        ? ValueProvider.StaticValueProvider.of(value.get())
-        : ValueProvider.StaticValueProvider.of(defaultValue);
+    return NestedValueProvider.of(
+        value,
+        (SerializableFunction<T, T>)
+            input -> {
+              if (input == null) {
+                return defaultValue;
+              }
+              return input;
+            });
   }
 }
