@@ -28,15 +28,15 @@
         <autovalue.version>1.7.4</autovalue.version>
         <autovalue.annotations.version>1.7.4</autovalue.annotations.version>
         <autovalue.service.version>1.0-rc6</autovalue.service.version>
-        <checkstyle.version>8.7</checkstyle.version>
+        <checkstyle.version>8.45.1</checkstyle.version>
         <beam.version>2.32.0</beam.version>
         <beam-vendor-guava.version>0.1</beam-vendor-guava.version>
         <hamcrest.version>2.1</hamcrest.version>
-        <hadoop.version>2.10.1</hadoop.version>
+        <hadoop.version>3.4.0</hadoop.version>
         <guava.version>30.1-jre</guava.version>
         <java.version>1.8</java.version>
         <jib.maven.version>2.6.0</jib.maven.version>
-        <junit.version>4.13</junit.version>
+        <junit.version>4.13.2</junit.version>
         <junit-dep.version>4.10</junit-dep.version>
         <opensensus.version>0.24.0</opensensus.version>
         <surefire.version>2.21.0</surefire.version>
@@ -52,7 +52,23 @@
         <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
         <slf4j.version>1.7.25</slf4j.version>
         <mvn-target-dir>${basedir}/target</mvn-target-dir>
-        <json.version>20200518</json.version>
+        <json.version>20231013</json.version>
+        <avro.version>1.11.4</avro.version>
+        <commons-text.version>1.10.0</commons-text.version>
+        <kafka-clients.version>3.9.2</kafka-clients.version>
+        <postgresql.version>42.7.12</postgresql.version>
+        <mysql-connector.version>8.4.0</mysql-connector.version>
+        <gson.version>2.8.9</gson.version>
+        <libthrift.version>0.23.0</libthrift.version>
+        <snakeyaml.version>2.0</snakeyaml.version>
+        <commons-beanutils.version>1.11.0</commons-beanutils.version>
+        <commons-configuration2.version>2.15.0</commons-configuration2.version>
+        <protobuf.version>3.25.5</protobuf.version>
+        <jackson.version>2.18.8</jackson.version>
+        <snappy.version>1.1.10.4</snappy.version>
+        <parquet.version>1.15.2</parquet.version>
+        <netty.version>4.1.135.Final</netty.version>
+        <commons-compress.version>1.21</commons-compress.version>
         <excluded.spanner.tests>com.google.cloud.teleport.v2.spanner.IntegrationTest</excluded.spanner.tests>
         <spotless-maven-plugin.version>2.12.1</spotless-maven-plugin.version>
     </properties>
@@ -66,6 +82,86 @@
           <type>pom</type>
           <scope>import</scope>
         </dependency>
+                <dependency>
+                    <groupId>com.google.code.gson</groupId>
+                    <artifactId>gson</artifactId>
+                    <version>${gson.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.avro</groupId>
+                    <artifactId>avro</artifactId>
+                    <version>${avro.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-text</artifactId>
+                    <version>${commons-text.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-configuration2</artifactId>
+                    <version>${commons-configuration2.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>commons-beanutils</groupId>
+                    <artifactId>commons-beanutils</artifactId>
+                    <version>${commons-beanutils.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-compress</artifactId>
+                    <version>${commons-compress.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.thrift</groupId>
+                    <artifactId>libthrift</artifactId>
+                    <version>${libthrift.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-common</artifactId>
+                    <version>${hadoop.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.postgresql</groupId>
+                    <artifactId>postgresql</artifactId>
+                    <version>${postgresql.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.yaml</groupId>
+                    <artifactId>snakeyaml</artifactId>
+                    <version>${snakeyaml.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                    <version>${protobuf.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>${jackson.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                    <version>${jackson.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.xerial.snappy</groupId>
+                    <artifactId>snappy-java</artifactId>
+                    <version>${snappy.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>org.apache.parquet</groupId>
+                    <artifactId>parquet-avro</artifactId>
+                    <version>${parquet.version}</version>
+                </dependency>
+                <dependency>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-handler</artifactId>
+                    <version>${netty.version}</version>
+                </dependency>
       </dependencies>
     </dependencyManagement>
 
