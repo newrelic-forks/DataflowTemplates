@@ -25,6 +25,8 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.apache.beam.sdk.options.PipelineOptionsFactory;
+import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.options.ValueProvider.StaticValueProvider;
 import org.junit.Test;
 
@@ -69,21 +71,30 @@ public class NewRelicConfigTest {
   @Test
   public void shouldUseCorrectDefaultValues() {
     // Given
+    // Defaults come from the @Default annotations, which only apply to real (non-mocked) options.
     final NewRelicPipelineOptions pipelineOptions =
-        getPipelineOptions(null, SOME_LICENSE_KEY, null, null, null, null, null);
+        PipelineOptionsFactory.fromArgs("--licenseKey=" + SOME_LICENSE_KEY)
+            .as(NewRelicPipelineOptions.class);
 
     // When
     final NewRelicConfig newRelicConfig = NewRelicConfig.fromPipelineOptions(pipelineOptions);
 
     // Then
-    assertThat(newRelicConfig.getLicenseKey().get()).isEqualTo(SOME_LICENSE_KEY);
-    assertThat(newRelicConfig.getLogsApiUrl().get()).isEqualTo(DEFAULT_LOGS_API_URL);
-    assertThat(newRelicConfig.getBatchCount().get()).isEqualTo(DEFAULT_BATCH_COUNT);
-    assertThat(newRelicConfig.getFlushDelay().get()).isEqualTo(DEFAULT_FLUSH_DELAY);
-    assertThat(newRelicConfig.getDisableCertificateValidation().get())
-        .isEqualTo(DEFAULT_DISABLE_CERTIFICATE_VALIDATION);
-    assertThat(newRelicConfig.getUseCompression().get()).isEqualTo(DEFAULT_USE_COMPRESSION);
-    assertThat(newRelicConfig.getParallelism().get()).isEqualTo(DEFAULT_PARALLELISM);
+    // Options built by the factory expose RuntimeValueProviders, whose values can't be read
+    // outside a running pipeline. Their toString includes the default configured via @Default.
+    assertThat(newRelicConfig.getLicenseKey().toString()).contains(SOME_LICENSE_KEY);
+    assertDefault(newRelicConfig.getLogsApiUrl(), DEFAULT_LOGS_API_URL);
+    assertDefault(newRelicConfig.getBatchCount(), DEFAULT_BATCH_COUNT);
+    assertDefault(newRelicConfig.getFlushDelay(), DEFAULT_FLUSH_DELAY);
+    assertDefault(
+        newRelicConfig.getDisableCertificateValidation(), DEFAULT_DISABLE_CERTIFICATE_VALIDATION);
+    assertDefault(newRelicConfig.getUseCompression(), DEFAULT_USE_COMPRESSION);
+    assertDefault(newRelicConfig.getParallelism(), DEFAULT_PARALLELISM);
+  }
+
+  private static void assertDefault(final ValueProvider<?> provider, final Object expected) {
+    assertThat(provider.isAccessible()).isFalse();
+    assertThat(provider.toString()).contains("default=" + expected);
   }
 
   private static NewRelicPipelineOptions getPipelineOptions(
