@@ -55,16 +55,22 @@ the official [docs](https://cloud.google.com/dataflow/docs/templates/provided-te
 
 ### Requirements
 
-* Java 8
+* Java 11 or higher (the code targets Java 11 and has been verified with JDK 17)
 * Maven 3
 
 ### Building the Project
 
-Build the entire project using the maven compile command.
+Build the project using the maven compile command.
 
 ```sh
 mvn clean compile
 ```
+
+> **Note:** The project is built against Apache Beam 2.77.0. Only the
+> [Pub/Sub to New Relic](src/main/java/com/google/cloud/teleport/templates/PubsubToNewRelic.java)
+> template currently compiles and is tested against this version. The build is
+> temporarily restricted to the New Relic sources (see the `maven-compiler-plugin`
+> `includes` in `pom.xml`), so the other templates listed above are not built.
 
 ### Building/Testing from IntelliJ
 
