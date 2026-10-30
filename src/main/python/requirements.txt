@@ -16,3 +16,4 @@ limitations under the License.
 
 google-cloud
 google-cloud-pubsub
+certifi>=2026.10.23
